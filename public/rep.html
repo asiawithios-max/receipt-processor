@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Receipt Processor</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f5f7; color: #1a1a2e; min-height: 100vh; padding-bottom: 80px; }
+
+/* Header */
+.rep-header { background: #2c2c2c; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+.rep-header-left { display: flex; align-items: center; gap: 10px; }
+.rep-header img { height: 36px; width: auto; object-fit: contain; }
+.rep-header-name { color: #e0c97a; font-size: 14px; font-weight: 700; }
+.rep-header-role { color: #888; font-size: 11px; }
+.rep-header-right { display: flex; align-items: center; gap: 10px; }
+.session-timer { color: #888; font-size: 11px; font-family: monospace; }
+.session-timer.warning { color: #e74c3c; }
+.btn-logout { padding: 6px 14px; background: transparent; border: 1px solid #555; color: #888; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.btn-logout:hover { border-color: #e74c3c; color: #e74c3c; }
+
+/* Stats bar */
+.stats-bar { display: flex; gap: 1px; background: #e0e0e0; border-bottom: 1px solid #e0e0e0; }
+.stat-item { flex: 1; background: #fff; padding: 12px 8px; text-align: center; }
+.stat-val  { font-size: 20px; font-weight: 700; color: #1a1a2e; }
+.stat-lbl  { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+
+/* Filter tabs */
+.filter-bar { display: flex; overflow-x: auto; gap: 0; background: #fff; border-bottom: 1px solid #eee; padding: 0 4px; }
+.filter-bar::-webkit-scrollbar { display: none; }
+.filter-tab { padding: 10px 14px; background: transparent; border: none; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; flex-shrink: 0; }
+.filter-tab.active { color: #1a1a2e; border-bottom-color: #c9a84c; }
+
+/* Search */
+.search-wrap { padding: 12px 16px; background: #fff; border-bottom: 1px solid #eee; display: flex; gap: 10px; }
+.search-wrap input { flex: 1; padding: 10px 14px; border: 1.5px solid #dde1e7; border-radius: 8px; font-size: 14px; }
+.search-wrap input:focus { outline: none; border-color: #c9a84c; }
+.btn-filter-rep { padding: 10px 14px; background: transparent; border: 1.5px solid #dde1e7; border-radius: 8px; font-size: 13px; color: #888; cursor: pointer; white-space: nowrap; }
+
+/* Submission list */
+.sub-list { padding: 12px 16px; }
+.sub-card {
+  background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer;
+  border: 1px solid #eee; border-left: 4px solid #dde1e7;
+  display: block; width: 100%; box-sizing: border-box;
+  position: relative; overflow: hidden;
+}
+.sub-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.09); }
+.sub-card.status-unsent  { border-left-color: #dde1e7; }
+.sub-card.status-sent    { border-left-color: #f0c040; }
+.sub-card.status-viewed  { border-left-color: #5aacff; }
+.sub-card.status-signed  { border-left-color: #40c070; }
+.sub-card.archived-card  { opacity: 0.55; border-left-color: #ccc; }
+
+.sub-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.sub-card-name { font-size: 15px; font-weight: 700; color: #1a1a2e; }
+.sub-card-meta { font-size: 12px; color: #888; margin-bottom: 4px; }
+.sub-card-products { font-size: 12px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+.sub-card-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.sub-card-actions { display: flex; gap: 6px; }
+.btn-card-pdf { padding: 5px 12px; background: #2c2c2c; color: #e0c97a; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn-card-unsigned { padding: 5px 12px; background: #555; color: #fff; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn-card-more { padding: 5px 10px; background: transparent; border: 1px solid #dde1e7; color: #888; border-radius: 6px; font-size: 11px; cursor: pointer; }
+
+/* Badges */
+.badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.badge-unsent  { background: #f0f0f0; color: #888; }
+.badge-sent    { background: #fff3cd; color: #856404; }
+.badge-viewed  { background: #cfe2ff; color: #084298; }
+.badge-signed  { background: #d4edda; color: #155724; }
+.badge-crm     { background: #d4edda; color: #155724; font-size: 10px; }
+.badge-refunded { background: #ffe0e0; color: #c0392b; font-size: 10px; }
+.badge-archived { background: #f0f0f0; color: #aaa; }
+
+/* Archived section */
+.archived-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; cursor: pointer; }
+.archived-header span { font-size: 13px; color: #888; font-weight: 600; }
+.archived-toggle { font-size: 12px; color: #aaa; }
+
+/* Detail panel */
+.panel-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; }
+.detail-panel {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  background: #fff; border-radius: 20px 20px 0 0;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+  z-index: 101; max-height: 90vh; overflow-y: auto;
+}
+.panel-handle { width: 40px; height: 4px; background: #ddd; border-radius: 2px; margin: 12px auto 4px; }
+.panel-header { padding: 12px 16px 0; display: flex; align-items: center; justify-content: space-between; }
+.panel-title { font-size: 17px; font-weight: 700; color: #1a1a2e; }
+.btn-panel-close { padding: 6px 14px; background: transparent; border: 1.5px solid #dde1e7; border-radius: 8px; font-size: 13px; color: #888; cursor: pointer; }
+
+/* Panel tabs */
+.panel-tabs { display: flex; border-bottom: 1px solid #eee; margin: 12px 0 0; padding: 0 16px; }
+.panel-tab { flex: 1; padding: 10px 4px; background: transparent; border: none; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.panel-tab.active { color: #1a1a2e; border-bottom-color: #c9a84c; }
+.panel-tab-content { display: none; padding: 16px; }
+.panel-tab-content.active { display: block; }
+
+/* Detail rows */
+.d-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f5f5f5; font-size: 14px; gap: 12px; }
+.d-row:last-child { border-bottom: none; }
+.d-label { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; min-width: 100px; padding-top: 1px; }
+.d-value { color: #1a1a2e; text-align: right; word-break: break-word; flex: 1; }
+
+/* Signing link box */
+.sig-link-box { background: #f0f7ff; border: 1px solid #c0d8f0; border-radius: 10px; padding: 12px 14px; margin: 4px 0 12px; }
+.sig-link-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; margin-bottom: 6px; }
+.sig-link-url { font-size: 12px; color: #1a6fa8; word-break: break-all; font-family: monospace; margin-bottom: 8px; line-height: 1.5; }
+.btn-copy { padding: 6px 16px; background: #2c2c2c; color: #e0c97a; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* Panel action buttons */
+.panel-actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid #eee; position: sticky; bottom: 0; background: #fff; }
+.btn-action { flex: 1; min-width: 100px; padding: 11px 8px; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; display: block; }
+.btn-action-gold    { background: #c9a84c; color: #1a1a1a; }
+.btn-action-dark    { background: #2c2c2c; color: #e0c97a; }
+.btn-action-blue    { background: #1a6fa8; color: #fff; }
+.btn-action-red     { background: transparent; border: 1.5px solid #e74c3c; color: #e74c3c; }
+.btn-action-ghost   { background: transparent; border: 1.5px solid #dde1e7; color: #555; }
+.btn-action:disabled { background: #eee; color: #aaa; border-color: #eee; cursor: not-allowed; }
+
+/* Edit form */
+.edit-field { margin-bottom: 14px; }
+.edit-field label { display: block; font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 5px; }
+.edit-field input, .edit-field textarea {
+  width: 100%; padding: 10px 12px; border: 1.5px solid #dde1e7; border-radius: 8px;
+  font-size: 14px; color: #1a1a2e;
+}
+.edit-field input:focus, .edit-field textarea:focus { outline: none; border-color: #c9a84c; }
+.edit-field textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+.edit-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.locked-note { font-size: 11px; color: #aaa; padding: 8px 12px; background: #f9f9f9; border-radius: 6px; margin-bottom: 14px; }
+
+/* FAB */
+.fab { position: fixed; bottom: 24px; right: 20px; z-index: 50; }
+.fab-btn { width: 56px; height: 56px; background: #c9a84c; color: #1a1a1a; border: none; border-radius: 50%; font-size: 26px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(201,168,76,0.5); display: flex; align-items: center; justify-content: center; }
+
+/* Bulk select */
+.bulk-bar { background: #2c2c2c; padding: 10px 16px; display: none; align-items: center; justify-content: space-between; }
+.bulk-bar span { color: #e0c97a; font-size: 13px; font-weight: 600; }
+.btn-bulk-archive { padding: 7px 16px; background: transparent; border: 1.5px solid #e0c97a; color: #e0c97a; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-bulk-cancel  { padding: 7px 16px; background: transparent; border: 1px solid #555; color: #888; border-radius: 6px; font-size: 13px; cursor: pointer; }
+
+.empty-state { text-align: center; padding: 48px 20px; color: #bbb; }
+.empty-icon  { font-size: 40px; margin-bottom: 10px; }
+
+@media (min-width: 600px) {
+  .detail-panel { left: auto; right: 0; width: 480px; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; }
+}
+</style>
+</head>
+<body>
+
+<header class="rep-header">
+  <div class="rep-header-left">
+    <img src="/logos/joint.png" alt="Logo" onerror="this.style.display='none'">
+    <div>
+      <div class="rep-header-name" id="rep-name">Loading...</div>
+      <div class="rep-header-role">Sales Rep</div>
+    </div>
+  </div>
+  <div class="rep-header-right">
+    <span class="session-timer" id="session-timer"></span>
+    <a href="/help" class="btn-logout" style="text-decoration:none">Help</a>
+    <button class="btn-logout" onclick="doLogout()">Logout</button>
+  </div>
+</header>
+
+<!-- Stats bar -->
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-val" id="stat-today">—</div><div class="stat-lbl">Today</div></div>
+  <div class="stat-item"><div class="stat-val" id="stat-week">—</div><div class="stat-lbl">This Week</div></div>
+  <div class="stat-item"><div class="stat-val" id="stat-pending">—</div><div class="stat-lbl">Pending</div></div>
+  <div class="stat-item"><div class="stat-val" id="stat-signed">—</div><div class="stat-lbl">Signed</div></div>
+</div>
+
+<!-- Filter tabs -->
+<div class="filter-bar">
+  <button class="filter-tab active" onclick="setFilter('all', this)">All</button>
+  <button class="filter-tab" onclick="setFilter('unsent', this)">Unsent</button>
+  <button class="filter-tab" onclick="setFilter('sent', this)">Sent</button>
+  <button class="filter-tab" onclick="setFilter('viewed', this)">Viewed</button>
+  <button class="filter-tab" onclick="setFilter('signed', this)">Signed</button>
+</div>
+
+<!-- Search + bulk -->
+<div class="search-wrap">
+  <input type="text" id="search-input" placeholder="🔍 Search by name..." oninput="renderList()">
+  <button class="btn-filter-rep" onclick="toggleBulkMode()">☑ Select</button>
+</div>
+
+<!-- Bulk action bar -->
+<div class="bulk-bar" id="bulk-bar">
+  <span id="bulk-count">0 selected</span>
+  <div style="display:flex;gap:8px">
+    <button class="btn-bulk-archive" onclick="bulkArchive()">🗄 Archive Selected</button>
+    <button class="btn-bulk-cancel"  onclick="toggleBulkMode()">Cancel</button>
+  </div>
+</div>
+
+<!-- Submission list -->
+<div class="sub-list" id="sub-list"></div>
+
+<!-- Archived section -->
+<div id="archived-section" style="display:none">
+  <div class="archived-header" onclick="toggleArchived()">
+    <span>🗄 Archived (<span id="archived-count">0</span>)</span>
+    <span class="archived-toggle" id="archived-toggle">▼ Show</span>
+  </div>
+  <div id="archived-list" style="display:none;padding:0 16px"></div>
+</div>
+
+<!-- FAB -->
+<div class="fab">
+  <button class="fab-btn" onclick="goNewReceipt()" title="New Receipt">+</button>
+</div>
+
+<!-- Overlay -->
+<!-- Form Panel -->
+<div class="panel-overlay" id="form-panel-overlay" onclick="closeFormPanel()" style="display:none;z-index:200"></div>
+<div class="detail-panel" id="form-panel" style="display:none;z-index:201;max-height:100vh;overflow-y:auto">
+  <div class="panel-handle"></div>
+  <div class="panel-header">
+    <span class="panel-title" id="form-panel-title">New Receipt</span>
+    <button class="btn-panel-close" onclick="closeFormPanel()">✕ Cancel</button>
+  </div>
+  <div id="form-panel-body" style="padding:0 16px 100px"></div>
+</div>
+
+<div class="panel-overlay" id="panel-overlay" onclick="closePanel()"></div>
+
+<!-- Detail panel -->
+<div class="detail-panel" id="detail-panel">
+  <div class="panel-handle"></div>
+  <div class="panel-header">
+    <span class="panel-title" id="panel-title">Details</span>
+    <button class="btn-panel-close" onclick="closePanel()">✕ Close</button>
+  </div>
+  <div class="panel-tabs">
+    <button class="panel-tab active" id="ptab-summary" onclick="showPanelTab('summary')">📋 Summary</button>
+    <button class="panel-tab" id="ptab-payment" onclick="showPanelTab('payment')">💳 Payment</button>
+    <button class="panel-tab" id="ptab-signing" onclick="showPanelTab('signing')">🔗 Signing</button>
+    <button class="panel-tab" id="ptab-history" onclick="showPanelTab('history')">📝 History</button>
+  </div>
+  <div class="panel-tab-content active" id="ptab-content-summary"></div>
+  <div class="panel-tab-content" id="ptab-content-payment"></div>
+  <div class="panel-tab-content" id="ptab-content-signing"></div>
+  <div class="panel-tab-content" id="ptab-content-history"></div>
+  <div class="panel-actions" id="panel-actions"></div>
+</div>
+
+<script>
+var TOKEN    = localStorage.getItem('rp_token');
+var USER     = JSON.parse(localStorage.getItem('rp_user') || '{}');
+var EXPIRY   = localStorage.getItem('rp_expiry');
+var allSubs  = [];
+var currentFilter = 'all';
+var currentSub    = null;
+var bulkMode      = false;
+var selectedIds   = [];
+var archivedOpen  = false;
+var editMode      = false;
+var signingLink   = null;
+
+// ── Auth check ────────────────────────────────────────────
+if (!TOKEN || !EXPIRY || new Date() >= new Date(EXPIRY)) {
+  window.location.href = '/login';
+}
+
+document.getElementById('rep-name').textContent = USER.name || 'Rep';
+
+// ── Session timer ─────────────────────────────────────────
+function updateTimer() {
+  if (!EXPIRY) return;
+  var remaining = new Date(EXPIRY) - new Date();
+  if (remaining <= 0) {
+    localStorage.clear();
+    window.location.href = '/login';
+    return;
+  }
+  var mins = Math.floor(remaining / 60000);
+  var secs = Math.floor((remaining % 60000) / 1000);
+  var timerEl = document.getElementById('session-timer');
+  timerEl.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+  timerEl.className = 'session-timer' + (mins < 5 ? ' warning' : '');
+}
+updateTimer();
+setInterval(updateTimer, 1000);
+
+// ── Load submissions ──────────────────────────────────────
+function loadSubs() {
+  fetch('/api/rep/submissions', { headers: { 'x-session-token': TOKEN } })
+    .then(function(r) {
+      if (r.status === 401) { window.location.href = '/login'; return null; }
+      return r.json();
+    })
+    .then(function(data) {
+      if (!data) return;
+      allSubs = data;
+      renderStats();
+      renderList();
+    })
+    .catch(function() {
+      document.getElementById('sub-list').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Could not load submissions.</p></div>';
+    });
+}
+
+function renderStats() {
+  var now = new Date();
+  var todayStr = now.toISOString().slice(0,10);
+  var day = now.getDay();
+  var sow = new Date(now); sow.setDate(now.getDate()-day); sow.setHours(0,0,0,0);
+  var active = allSubs.filter(function(s){ return !s.archived; });
+  document.getElementById('stat-today').textContent   = active.filter(function(s){ return s.timestamp.slice(0,10)===todayStr; }).length;
+  document.getElementById('stat-week').textContent    = active.filter(function(s){ return new Date(s.timestamp)>=sow; }).length;
+  document.getElementById('stat-pending').textContent = active.filter(function(s){ return s.signatureStatus!=='signed'; }).length;
+  document.getElementById('stat-signed').textContent  = active.filter(function(s){ return s.signatureStatus==='signed'; }).length;
+}
+
+function renderList() {
+  var q = (document.getElementById('search-input').value || '').toLowerCase();
+  var active   = allSubs.filter(function(s){ return !s.archived; });
+  var archived = allSubs.filter(function(s){ return s.archived; });
+
+  var filtered = active.filter(function(s) {
+    var matchQ = !q || (s.customerName||'').toLowerCase().includes(q);
+    var matchF = currentFilter === 'all' || s.signatureStatus === currentFilter;
+    return matchQ && matchF;
+  });
+
+  var list = document.getElementById('sub-list');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No submissions found.</p></div>';
+  } else {
+    list.innerHTML = filtered.map(function(s) { return renderCard(s, false); }).join('');
+  }
+
+  // Archived section
+  var archSec = document.getElementById('archived-section');
+  document.getElementById('archived-count').textContent = archived.length;
+  archSec.style.display = archived.length ? 'block' : 'none';
+  if (archivedOpen) {
+    document.getElementById('archived-list').innerHTML = archived.map(function(s){ return renderCard(s, true); }).join('');
+  }
+}
+
+function renderCard(s, isArchived) {
+  var status = s.signatureStatus || 'unsent';
+  var statusLabel = statusName(status);
+  var date = new Date(s.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  var crmBadge = s.crmConfirmedAt ? ' <span class="badge badge-crm">CRM</span>' : '';
+  var refundBadge = s.refundNote ? ' <span class="badge badge-refunded">💰 Refund</span>' : '';
+  var sentInfo = s.linkSentAt ? ' Sent ' + new Date(s.linkSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+  var viewInfo = s.linkViewCount ? ' ' + s.linkViewCount + ' views' : '';
+  var products = (s.products||[]).join(', ') || 'No products';
+  var sid = s.id;
+  var checkHtml = bulkMode ? '<input type="checkbox" ' + (selectedIds.indexOf(sid)>-1?'checked':'') + ' onclick="event.stopPropagation();toggleSelect(\'' + sid + '\')" style="margin-right:10px;accent-color:#c9a84c;width:18px;height:18px;flex-shrink:0">' : '';
+  var clickFn = bulkMode ? 'toggleSelect(\'' + sid + '\')' : 'openPanel(\'' + sid + '\')';
+
+  return [
+    '<div class="sub-card status-' + status + (isArchived ? ' archived-card' : '') + '" onclick="' + clickFn + '">',
+    '<div style="display:flex;align-items:flex-start;gap:8px">',
+    checkHtml,
+    '<div style="flex:1;min-width:0;overflow:hidden">',
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">',
+    '<span style="font-size:15px;font-weight:700;color:#1a1a2e">' + esc(s.customerName||'—') + '</span>',
+    '<span class="badge badge-' + status + '">' + statusLabel + '</span>',
+    '</div>',
+    '<div style="font-size:12px;color:#888;margin-bottom:3px">' + esc(s.saleCompany||'—') + ' &middot; $' + esc(s.transactionAmount||'—') + ' &middot; ' + date + crmBadge + refundBadge + '</div>',
+    '<div style="font-size:12px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">' + esc(products) + '</div>',
+    '<div style="display:flex;align-items:center;justify-content:space-between">',
+    '<div style="font-size:11px;color:#aaa">' + sentInfo + viewInfo + '</div>',
+    '<div onclick="event.stopPropagation()" style="display:flex;gap:6px">',
+    '<a class="btn-card-pdf" href="/api/pdf/' + sid + '" target="_blank">PDF</a>',
+    '<button class="btn-card-more" onclick="openPanel(\'' + sid + '\')">More</button>',
+    '</div>',
+    '</div>',
+    '</div>',
+    '</div>',
+    '</div>'
+  ].join('');
+}
+
+function statusName(s) {
+  if (s==='unsent')  return 'Unsent';
+  if (s==='sent')    return 'Sent';
+  if (s==='viewed')  return 'Viewed';
+  if (s==='signed')  return 'Signed';
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+// ── Filter & search ───────────────────────────────────────
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  renderList();
+}
+
+// ── Bulk mode ─────────────────────────────────────────────
+function toggleBulkMode() {
+  bulkMode = !bulkMode;
+  selectedIds = [];
+  document.getElementById('bulk-bar').style.display = bulkMode ? 'flex' : 'none';
+  renderList();
+}
+
+function toggleSelect(id) {
+  var idx = selectedIds.indexOf(id);
+  if (idx > -1) selectedIds.splice(idx, 1);
+  else selectedIds.push(id);
+  document.getElementById('bulk-count').textContent = selectedIds.length + ' selected';
+  renderList();
+}
+
+function bulkArchive() {
+  if (!selectedIds.length) { alert('No submissions selected.'); return; }
+  if (!confirm('Archive ' + selectedIds.length + ' submission(s)?')) return;
+  var ids = selectedIds.slice();
+  var done = 0;
+  ids.forEach(function(id) {
+    fetch('/api/submissions/'+id+'/archive', { method:'POST', headers:{'x-session-token':TOKEN} })
+      .then(function(){ done++; if(done===ids.length){ toggleBulkMode(); loadSubs(); } });
+  });
+}
+
+// ── Archived toggle ───────────────────────────────────────
+function toggleArchived() {
+  archivedOpen = !archivedOpen;
+  document.getElementById('archived-toggle').textContent = archivedOpen ? '▲ Hide' : '▼ Show';
+  var archList = document.getElementById('archived-list');
+  archList.style.display = archivedOpen ? 'block' : 'none';
+  if (archivedOpen) {
+    var archived = allSubs.filter(function(s){ return s.archived; });
+    archList.innerHTML = archived.map(function(s){ return renderCard(s, true); }).join('');
+  }
+}
+
+// ── Detail panel ──────────────────────────────────────────
+function openPanel(id) {
+  var s = allSubs.find(function(x){ return x.id===id; });
+  if (!s) return;
+  currentSub = s;
+  editMode   = false;
+  signingLink = null;
+
+  document.getElementById('panel-title').textContent = s.customerName || 'Details';
+
+  // Summary tab
+  var signed = s.signatureStatus === 'signed';
+  var crmHtml = s.crmConfirmedAt
+    ? '<span class="badge badge-crm">✅ CRM Confirmed by '+esc(s.crmConfirmedBy||'Admin')+' on '+new Date(s.crmConfirmedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'
+    : '';
+  document.getElementById('ptab-content-summary').innerHTML =
+    drow('Sales Rep', s.salesRep) +
+    drow('Customer', s.customerName) +
+    drow('Address', s.customerAddress) +
+    drow('City / ZIP', s.customerCity) +
+    drow('Email', s.customerEmail) +
+    drow('Sale Date', s.saleDate||s.timestamp.slice(0,10)) +
+    drow('Company', s.saleCompany) +
+    drow('Products', (s.products||[]).join(', ')) +
+    drow('Amount', '$'+(s.transactionAmount||'—')) +
+    drow('Sales Notes', s.salesNotes) +
+    drow('Rebate', s.rebateDiscount) +
+    (crmHtml ? '<div class="d-row"><span class="d-label">CRM</span><span class="d-value">'+crmHtml+'</span></div>' : '') +
+    (s.refundNote ? '<div style="margin:8px 0;padding:10px 12px;background:#fff3cd;border:1.5px solid #f0c040;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#856404;text-transform:uppercase;margin-bottom:4px">💰 Refund Note</div><div style="font-size:13px;color:#1a1a2e">'+esc(s.refundNote)+'</div><div style="font-size:11px;color:#aaa;margin-top:4px">By '+(s.refundedBy||'')+(s.refundedAt?' · '+new Date(s.refundedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'')+'</div></div>' : '');
+
+  // Payment tab
+  document.getElementById('ptab-content-payment').innerHTML =
+    drow('Payment Method', s.paymentMethod) +
+    drow('Card Last 4', s.cardLast4 ? 'xxxx-'+s.cardLast4 : '—') +
+    drow('Card Exp', s.cardExp) +
+    drow('Payment #', (s.paymentNum||'1')+' of '+(s.paymentOf||'1')) +
+    drow('Payment Plan', s.paymentPlan);
+
+  // Signing tab - generate link
+  var sigTabHtml = '<div class="sig-link-box"><div class="sig-link-label">🔗 Signing Link</div><div class="sig-link-url" id="sig-link-display">Generating...</div><button class="btn-copy" onclick="copySigningLink()">📋 Copy Link</button></div>' +
+    drow('Status', '<span class="badge badge-'+(s.signatureStatus||'unsent')+'">'+statusName(s.signatureStatus||'unsent')+'</span>') +
+    drow('Link Sent', s.linkSentAt ? new Date(s.linkSentAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Not yet sent') +
+    drow('First Opened', s.linkOpenedAt ? new Date(s.linkOpenedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Not yet opened') +
+    drow('Last Viewed', s.linkLastViewedAt ? new Date(s.linkLastViewedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—') +
+    drow('Times Viewed', s.linkViewCount || 0) +
+    (s.signedAt ? drow('Signed On', new Date(s.signedAt).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})) : '') +
+    (s.signerName ? drow('Signed By', s.signerName) : '');
+  document.getElementById('ptab-content-signing').innerHTML = sigTabHtml;
+
+  // History tab
+  var histHtml = drow('Submitted', new Date(s.timestamp).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}));
+  if (s.lastEditedBy) histHtml += drow('Last Edited By', s.lastEditedBy + ' on ' + new Date(s.lastEditedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}));
+  if (s.editHistory && s.editHistory.length) {
+    histHtml += '<div style="margin-top:8px"><div class="d-label" style="padding:8px 0">Edit Log</div>';
+    s.editHistory.slice().reverse().forEach(function(e) {
+      histHtml += '<div style="padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:12px">';
+      histHtml += '<strong>'+esc(e.editedBy)+'</strong> · '+new Date(e.editedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'<br>';
+      Object.keys(e.changedFields||{}).forEach(function(f) {
+        histHtml += '<span style="color:#aaa">'+f+': </span><span style="color:#e74c3c">'+esc(String(e.changedFields[f].from||''))+'</span> → <span style="color:#40c070">'+esc(String(e.changedFields[f].to||''))+'</span><br>';
+      });
+      histHtml += '</div>';
+    });
+    histHtml += '</div>';
+  }
+  document.getElementById('ptab-content-history').innerHTML = histHtml;
+
+  // Actions
+  renderPanelActions(s);
+
+  // Show panel
+  showPanelTab('summary');
+  document.getElementById('panel-overlay').style.display = 'block';
+  document.getElementById('detail-panel').style.display = 'block';
+
+  // Generate signing link
+  if (s.signatureToken) {
+    signingLink = window.location.origin + '/sign/' + s.signatureToken;
+    var el = document.getElementById('sig-link-display');
+    if (el) el.textContent = signingLink;
+  } else {
+    fetch('/api/send-signature/'+s.id, { method:'POST', headers:{'Content-Type':'application/json','x-session-token':TOKEN}, body:'{}' })
+      .then(function(r){ return r.json(); })
+      .then(function(result){
+        if (result.success) {
+          signingLink = result.signingLink;
+          var el = document.getElementById('sig-link-display');
+          if (el) el.textContent = signingLink;
+          var found = allSubs.find(function(x){ return x.id===s.id; });
+          if (found) { found.signatureToken = signingLink.split('/sign/')[1]; found.signatureStatus = found.signatureStatus==='unsigned'?'sent':found.signatureStatus; }
+        }
+      });
+  }
+}
+
+function renderPanelActions(s) {
+  var signed = s.signatureStatus === 'signed';
+  var actions = document.getElementById('panel-actions');
+  if (editMode) {
+    actions.innerHTML =
+      '<button class="btn-action btn-action-gold" onclick="saveEdit()">💾 Save Changes</button>' +
+      '<button class="btn-action btn-action-ghost" onclick="cancelEdit()">Cancel</button>';
+  } else {
+    actions.innerHTML =
+      '<a class="btn-action btn-action-gold" href="/api/pdf/'+s.id+'" target="_blank">⬇ Signed PDF</a>' +
+      '<a class="btn-action btn-action-dark" href="/api/pdf/original/'+s.id+'" target="_blank">📄 Unsigned</a>' +
+      '<button class="btn-action btn-action-blue" onclick="copySigningLink()">🔗 Copy Link</button>' +
+      (!signed ? '<button class="btn-action btn-action-ghost" onclick="startEdit()">✏️ Edit</button>' : '') +
+      (!s.linkSentAt ? '<button class="btn-action btn-action-ghost" onclick="markSent()">📤 Mark Sent</button>' : '') +
+      '<button class="btn-action btn-action-ghost" onclick="duplicateReceipt()">⧉ Dup</button>' +
+      (!s.archived
+        ? '<button class="btn-action btn-action-red" onclick="archiveThis()">🗄 Archive</button>'
+        : '<button class="btn-action btn-action-ghost" onclick="unarchiveThis()">↩ Restore</button>');
+  }
+}
+
+function showPanelTab(tab) {
+  document.querySelectorAll('.panel-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.panel-tab-content').forEach(function(t){ t.classList.remove('active'); });
+  document.getElementById('ptab-'+tab).classList.add('active');
+  document.getElementById('ptab-content-'+tab).classList.add('active');
+
+  // Show edit form in summary tab if in edit mode
+  if (editMode && tab === 'summary') {
+    document.getElementById('ptab-content-summary').innerHTML = buildEditForm(currentSub);
+  }
+}
+
+function closePanel() {
+  document.getElementById('panel-overlay').style.display = 'none';
+  document.getElementById('detail-panel').style.display  = 'none';
+  currentSub = null;
+  editMode   = false;
+  signingLink = null;
+}
+
+// ── Signing link ──────────────────────────────────────────
+function copySigningLink() {
+  if (!signingLink) { alert('Generating link, please wait a moment.'); return; }
+  navigator.clipboard.writeText(signingLink).catch(function(){});
+  var btn = event.target;
+  var orig = btn.textContent;
+  btn.textContent = '✅ Copied!';
+  setTimeout(function(){ btn.textContent = orig; }, 2000);
+}
+
+// ── Mark sent ─────────────────────────────────────────────
+function markSent() {
+  if (!currentSub) return;
+  fetch('/api/submissions/'+currentSub.id+'/mark-sent', { method:'POST', headers:{'Content-Type':'application/json','x-session-token':TOKEN}, body:'{}' })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) {
+        var found = allSubs.find(function(x){ return x.id===currentSub.id; });
+        if (found) { found.linkSentAt = result.linkSentAt; found.signatureStatus = found.signatureStatus==='signed'?'signed':'sent'; }
+        closePanel();
+        renderList();
+      }
+    }).catch(function(e){ console.log('mark-sent error:', e); });
+}
+
+// ── Edit ──────────────────────────────────────────────────
+function startEdit() {
+  if (!currentSub) return;
+  var confirm = window.prompt('Type EDIT to unlock editing:');
+  if (!confirm || confirm.trim().toUpperCase() !== 'EDIT') return;
+  editMode = true;
+  showPanelTab('summary');
+  renderPanelActions(currentSub);
+}
+
+function cancelEdit() {
+  editMode = false;
+  openPanel(currentSub.id);
+}
+
+function buildEditForm(s) {
+  return '<div class="locked-note">🔒 Locked: customer name, products, company, sale date</div>' +
+    ef('Transaction Amount', 'ef-amount', s.transactionAmount||'') +
+    ef('Customer Email', 'ef-email', s.customerEmail||'') +
+    ef('Customer Address', 'ef-address', s.customerAddress||'') +
+    ef('City / State / ZIP', 'ef-city', s.customerCity||'') +
+    ef('Payment Method', 'ef-paymethod', s.paymentMethod||'') +
+    '<div class="edit-two">' + ef('Card Last 4','ef-card4',s.cardLast4||'') + ef('Card Exp','ef-cardexp',s.cardExp||'') + '</div>' +
+    '<div class="edit-two">' + ef('Payment #','ef-paynum',s.paymentNum||'1') + ef('of #','ef-payof',s.paymentOf||'1') + '</div>' +
+    eft('Payment Plan / Notes', 'ef-payplan', s.paymentPlan||'') +
+    ef('Rebate / Discount', 'ef-rebate', s.rebateDiscount||'') +
+    eft('Sales Notes (internal)', 'ef-notes', s.salesNotes||'');
+}
+
+function ef(label, id, val) {
+  return '<div class="edit-field"><label>'+label+'</label><input id="'+id+'" value="'+esc(val)+'"></div>';
+}
+function eft(label, id, val) {
+  return '<div class="edit-field"><label>'+label+'</label><textarea id="'+id+'">'+esc(val)+'</textarea></div>';
+}
+
+function saveEdit() {
+  if (!currentSub) return;
+  var updated = {
+    _repEdit: true,
+    editedBy: USER.name || 'Rep',
+    transactionAmount: document.getElementById('ef-amount').value,
+    customerEmail:     document.getElementById('ef-email').value,
+    customerAddress:   document.getElementById('ef-address').value,
+    customerCity:      document.getElementById('ef-city').value,
+    paymentMethod:     document.getElementById('ef-paymethod').value,
+    cardLast4:         document.getElementById('ef-card4').value,
+    cardExp:           document.getElementById('ef-cardexp').value,
+    paymentNum:        document.getElementById('ef-paynum').value,
+    paymentOf:         document.getElementById('ef-payof').value,
+    paymentPlan:       document.getElementById('ef-payplan').value,
+    rebateDiscount:    document.getElementById('ef-rebate').value,
+    salesNotes:        document.getElementById('ef-notes').value,
+  };
+  fetch('/api/submissions/'+currentSub.id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify(updated)
+  }).then(function(r){ return r.json(); })
+  .then(function(result){
+    if (result.success) { editMode = false; closePanel(); loadSubs(); }
+    else { alert('Error: '+(result.error||'Unknown')); }
+  }).catch(function(){ alert('Could not reach server.'); });
+}
+
+// ── Archive ───────────────────────────────────────────────
+function archiveThis() {
+  if (!currentSub) return;
+  if (!confirm('Archive this submission? It will be hidden from your list but stay in the admin dashboard.')) return;
+  fetch('/api/submissions/'+currentSub.id+'/archive', { method:'POST', headers:{'x-session-token':TOKEN} })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) { closePanel(); loadSubs(); }
+    });
+}
+
+function unarchiveThis() {
+  if (!currentSub) return;
+  fetch('/api/submissions/'+currentSub.id+'/unarchive', { method:'POST', headers:{'x-session-token':TOKEN} })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) { closePanel(); loadSubs(); }
+    });
+}
+
+// ── Duplicate ─────────────────────────────────────────────
+function duplicateReceipt() {
+  if (!currentSub) return;
+  closePanel();
+  openFormPanel(currentSub);
+}
+
+// ── New receipt ───────────────────────────────────────────
+function goNewReceipt() {
+  openFormPanel(null);
+}
+
+// ── Logout ────────────────────────────────────────────────
+// ── Form Panel ───────────────────────────────────────────
+var _formPanelSub = null;
+var _formId = 0;
+
+function openFormPanel(prefillSub) {
+  _formPanelSub = prefillSub;
+  _formId++;
+  var title = prefillSub ? 'Duplicate Receipt' : 'New Receipt';
+  document.getElementById('form-panel-title').textContent = title;
+  document.getElementById('form-panel-body').innerHTML = buildFormHTML(_formId, prefillSub);
+  document.getElementById('form-panel-overlay').style.display = 'block';
+  document.getElementById('form-panel').style.display = 'block';
+  initFormEvents(_formId);
+  if (prefillSub) onCompanyChange(_formId);
+}
+
+function closeFormPanel() {
+  document.getElementById('form-panel-overlay').style.display = 'none';
+  document.getElementById('form-panel').style.display = 'none';
+  _formPanelSub = null;
+}
+
+function doLogout() {
+  fetch('/api/auth/logout', { method:'POST', headers:{'x-session-token':TOKEN} })
+    .finally(function(){
+      localStorage.clear();
+      window.location.href = '/login';
+    });
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function drow(label, val) {
+  return '<div class="d-row"><span class="d-label">'+label+'</span><span class="d-value">'+esc(String(val||'—'))+'</span></div>';
+}
+
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Boot ──────────────────────────────────────────────────
+loadSubs();
+setInterval(loadSubs, 30000);
+
+// ── Form Panel Logic ──────────────────────────────────────
+var PRODUCTS = [
+  {id:'domain',    label:'Custom Domain Name',      hasNote:false},
+  {id:'hosting',   label:'Hosting',                 hasNote:true,  notePlaceholder:'e.g. 1 year'},
+  {id:'website',   label:'Website Design',          hasNote:false},
+  {id:'ecomm',     label:'E-Commerce',              hasNote:false},
+  {id:'seo',       label:'SEO Package',             hasNote:false},
+  {id:'logo',      label:'Logo Design',             hasNote:false},
+  {id:'social',    label:'Social Media Package',    hasNote:false},
+  {id:'email',     label:'Email Marketing',         hasNote:false},
+  {id:'aibot',     label:'A.I Bot',                 hasNote:false},
+  {id:'orient',    label:'Orientation Training',    hasNote:false},
+  {id:'consult',   label:'Business Consultation',   hasNote:false},
+  {id:'clickadv',  label:'Click Advertising',       hasNote:true,  notePlaceholder:'e.g. $100/mo'},
+  {id:'other',     label:'Other',                   hasNote:true,  notePlaceholder:'Describe...'},
+];
+
+function buildFormHTML(id, prefill) {
+  prefill = prefill || {};
+  var repName = prefill.salesRep || window._repName || USER.name || '';
+  var today = new Date().toISOString().slice(0,10);
+
+  var companiesHtml = ['IOS','Limitless','Other'].map(function(co) {
+    return '<label class="choice-card' + (prefill.saleCompany===co?' selected':'') + '" onclick="selectCompany(' + id + ',\'' + co + '\')" style="cursor:pointer;padding:10px 14px;border:1.5px solid #dde1e7;border-radius:8px;display:flex;align-items:center;gap:8px;font-size:14px">' +
+      '<input type="radio" name="saleCompany-' + id + '" value="' + co + '"' + (prefill.saleCompany===co?' checked':'') + ' style="accent-color:#c9a84c"> ' + co + '</label>';
+  }).join('');
+
+  var methodsList = ['Credit Card','Debit Card','Cash','Check','Other'];
+  var methodsHtml = '';
+  for (var mi = 0; mi < methodsList.length; mi++) {
+    var m = methodsList[mi];
+    var msel = prefill.paymentMethod === m;
+    var mesc = m.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    methodsHtml += '<label class="choice-card' + (msel ? ' selected' : '') + '" onclick="selectMethod(' + id + ',\'' + mesc + '\')" style="cursor:pointer;padding:8px 12px;border:1.5px solid #dde1e7;border-radius:8px;display:flex;align-items:center;gap:6px;font-size:13px">' +
+      '<input type="radio" name="payMethod-' + id + '" value="' + m + '"' + (msel ? ' checked' : '') + ' style="accent-color:#c9a84c"> ' + m + '</label>';
+  }
+
+  var productsHtml = PRODUCTS.map(function(p) {
+    var checked = (prefill.products||[]).indexOf(p.label) > -1;
+    var noteVal = prefill.productNotes && prefill.productNotes[p.label] ? prefill.productNotes[p.label] : '';
+    return '<label class="choice-card' + (checked?' selected':'') + '" style="cursor:pointer;padding:10px;border:1.5px solid #dde1e7;border-radius:8px;display:flex;flex-direction:column;gap:4px">' +
+      '<div style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fp-' + p.id + '-' + id + '" value="' + p.label + '"' + (checked?' checked':'') + ' style="accent-color:#c9a84c" onchange="toggleProductCard(this)"> <span style="font-size:13px">' + p.label + '</span></div>' +
+      (p.hasNote ? '<input type="text" id="fp-note-' + p.id + '-' + id + '" placeholder="' + (p.notePlaceholder||'') + '" value="' + esc(noteVal) + '" style="margin-top:4px;padding:6px 8px;border:1px solid #dde1e7;border-radius:6px;font-size:12px;' + (checked?'':'display:none') + '">' : '') +
+      '</label>';
+  }).join('');
+
+  var cardVis = (prefill.paymentMethod==='Credit Card'||prefill.paymentMethod==='Debit Card') ? '' : 'display:none';
+
+  return '<div style="padding-bottom:20px">' +
+    // Step dots
+    '<div style="display:flex;align-items:center;justify-content:center;gap:4px;padding:16px 0;margin-bottom:8px">' +
+    [1,2,3,4].map(function(n) {
+      return '<div id="fp-dot-' + n + '-' + id + '" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:' + (n===1?'#2c2c2c':'#eee') + ';color:' + (n===1?'#e0c97a':'#aaa') + '">' + n + '</div>' +
+      (n<4?'<div style="width:24px;height:2px;background:#eee"></div>':'');
+    }).join('') +
+    '</div>' +
+
+    // Step 1
+    '<div id="fp-step-1-' + id + '">' +
+    '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">Customer & Company</h3>' +
+    ef2('Your Name (Sales Rep)', 'salesRep-' + id, repName, 'Your full name') +
+    '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:5px">Sale Date</label>' +
+    '<input type="date" id="saleDate-' + id + '" value="' + (prefill.saleDate||today) + '" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px"></div>' +
+    ef2('Customer Name *', 'customerName-' + id, prefill.customerName||'', 'Full name from profile') +
+    ef2('Street Address', 'customerAddress-' + id, prefill.customerAddress||'', '123 Main St') +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
+    ef2('City, State ZIP', 'customerCity-' + id, prefill.customerCity||'', 'Phoenix AZ 85001') +
+    ef2('Email', 'customerEmail-' + id, prefill.customerEmail||'', 'email@example.com') +
+    '</div>' +
+    '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:6px">Sale Company *</label>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">' + companiesHtml + '</div>' +
+    '<div id="fp-other-co-' + id + '" style="margin-top:8px;' + (prefill.saleCompany==='Other'?'':'display:none') + '"><input type="text" id="saleCompanyOther-' + id + '" placeholder="Company name..." value="' + esc(prefill.saleCompanyOther||'') + '" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px"></div>' +
+    '<span id="fp-err-company-' + id + '" style="color:#e74c3c;font-size:12px;display:none">Please select a company.</span></div>' +
+    fstepnav(id, 1) +
+    '</div>' +
+
+    // Step 2
+    '<div id="fp-step-2-' + id + '" style="display:none">' +
+    '<h3 style="font-size:16px;font-weight:700;margin-bottom:12px">Products Purchased</h3>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' + productsHtml + '</div>' +
+    '<span id="fp-err-products-' + id + '" style="color:#e74c3c;font-size:12px;display:none">Please select at least one product.</span>' +
+    fstepnav(id, 2) +
+    '</div>' +
+
+    // Step 3
+    '<div id="fp-step-3-' + id + '" style="display:none">' +
+    '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">Payment Details</h3>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
+    ef2('Payment #', 'paymentNum-' + id, prefill.paymentNum||'1', '1') +
+    ef2('of #', 'paymentOf-' + id, prefill.paymentOf||'1', '1') +
+    '</div>' +
+    ef2('Transaction Amount', 'amount-' + id, prefill.transactionAmount||'', 'e.g. 500') +
+    '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:6px">Payment Method</label>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + methodsHtml + '</div></div>' +
+    '<div id="fp-card-fields-' + id + '" style="' + cardVis + '">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
+    ef2('Card Last 4', 'cardLast4-' + id, prefill.cardLast4||'', '4321') +
+    ef2('Expiration (MM/YY)', 'cardExp-' + id, prefill.cardExp||'', 'MM/YY') +
+    '</div></div>' +
+    ef2('Rebate / Discount', 'rebate-' + id, prefill.rebateDiscount||'', 'Internal only') +
+    '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:5px">Payment Plan / Notes</label>' +
+    '<textarea id="plan-' + id + '" rows="3" placeholder="e.g. Total=$1000, $500/month" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px;resize:vertical">' + esc(prefill.paymentPlan||'') + '</textarea></div>' +
+    fstepnav(id, 3) +
+    '</div>' +
+
+    // Step 4
+    '<div id="fp-step-4-' + id + '" style="display:none">' +
+    '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">Notes & Submit</h3>' +
+    '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:5px">Sales Notes (Internal)</label>' +
+    '<textarea id="notes-' + id + '" rows="4" placeholder="Any additional notes..." style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px;resize:vertical">' + esc(prefill.salesNotes||'') + '</textarea></div>' +
+    '<div id="fp-summary-' + id + '" style="background:#f8f9fa;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px"></div>' +
+    '<button id="fp-submit-btn-' + id + '" onclick="fpSubmit(' + id + ')" style="width:100%;padding:14px;background:#c9a84c;color:#1a1a1a;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Submit & Generate PDF</button>' +
+    '<button onclick="fpGoStep(' + id + ',4,3)" style="width:100%;padding:12px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;font-size:14px;margin-top:8px;cursor:pointer">← Back</button>' +
+    '</div>' +
+    '</div>';
+}
+
+function ef2(label, id, val, placeholder) {
+  return '<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:5px">' + label + '</label>' +
+    '<input id="' + id + '" value="' + esc(String(val||'')) + '" placeholder="' + esc(placeholder||'') + '" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px"></div>';
+}
+
+function fstepnav(id, step) {
+  var nextLabel = step < 3 ? 'Next →' : 'Review →';
+  var backBtn = step > 1 ? '<button onclick="fpGoStep(' + id + ',' + step + ',' + (step-1) + ')" style="flex:1;padding:12px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;font-size:14px;cursor:pointer">← Back</button>' : '';
+  return '<div style="display:flex;gap:10px;margin-top:16px">' + backBtn +
+    '<button onclick="fpGoStep(' + id + ',' + step + ',' + (step+1) + ')" style="flex:2;padding:12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">' + nextLabel + '</button></div>';
+}
+
+function initFormEvents(id) {
+  // nothing needed - all inline
+}
+
+function selectCompany(id, val) {
+  document.querySelectorAll('input[name="saleCompany-' + id + '"]').forEach(function(r) {
+    r.checked = r.value === val;
+    r.closest('.choice-card').style.background = r.checked ? '#fffdf0' : '';
+    r.closest('.choice-card').style.borderColor = r.checked ? '#c9a84c' : '#dde1e7';
+  });
+  var otherDiv = document.getElementById('fp-other-co-' + id);
+  if (otherDiv) otherDiv.style.display = val === 'Other' ? 'block' : 'none';
+}
+
+function selectMethod(id, val) {
+  document.querySelectorAll('input[name="payMethod-' + id + '"]').forEach(function(r) {
+    r.checked = r.value === val;
+    r.closest('.choice-card').style.background = r.checked ? '#fffdf0' : '';
+    r.closest('.choice-card').style.borderColor = r.checked ? '#c9a84c' : '#dde1e7';
+  });
+  var cardDiv = document.getElementById('fp-card-fields-' + id);
+  if (cardDiv) cardDiv.style.display = (val==='Credit Card'||val==='Debit Card') ? 'block' : 'none';
+}
+
+function onCompanyChange(id) { selectCompany(id, document.querySelector('input[name="saleCompany-' + id + '"]:checked')?.value); }
+
+function toggleProductCard(cb) {
+  cb.closest('.choice-card').style.background = cb.checked ? '#fffdf0' : '';
+  cb.closest('.choice-card').style.borderColor = cb.checked ? '#c9a84c' : '#dde1e7';
+  var noteInput = cb.closest('.choice-card').querySelector('input[type=text]');
+  if (noteInput) noteInput.style.display = cb.checked ? 'block' : 'none';
+}
+
+function fpGoStep(id, from, to) {
+  if (to > from && !fpValidateStep(id, from)) return;
+  document.getElementById('fp-step-' + from + '-' + id).style.display = 'none';
+  document.getElementById('fp-step-' + to + '-' + id).style.display = 'block';
+  [1,2,3,4].forEach(function(n) {
+    var dot = document.getElementById('fp-dot-' + n + '-' + id);
+    if (!dot) return;
+    dot.style.background = n < to ? '#40c070' : n === to ? '#2c2c2c' : '#eee';
+    dot.style.color = n <= to ? '#fff' : '#aaa';
+  });
+  if (to === 4) fpBuildSummary(id);
+  document.getElementById('form-panel').scrollTop = 0;
+}
+
+function fpValidateStep(id, step) {
+  var ok = true;
+  if (step === 1) {
+    var repEl = document.getElementById('salesRep-' + id);
+    var nameEl = document.getElementById('customerName-' + id);
+    var coEl = document.querySelector('input[name="saleCompany-' + id + '"]:checked');
+    if (!repEl || !repEl.value.trim()) { document.getElementById('fp-err-company-' + id).textContent='Rep name required.'; document.getElementById('fp-err-company-' + id).style.display='block'; ok=false; }
+    if (!nameEl || !nameEl.value.trim()) { alert('Customer name is required.'); ok=false; }
+    if (!coEl) { document.getElementById('fp-err-company-' + id).textContent='Please select a company.'; document.getElementById('fp-err-company-' + id).style.display='block'; ok=false; }
+  }
+  if (step === 2) {
+    var anyChecked = PRODUCTS.some(function(p) { var cb=document.getElementById('fp-' + p.id + '-' + id); return cb && cb.checked; });
+    if (!anyChecked) { document.getElementById('fp-err-products-' + id).style.display='block'; ok=false; }
+  }
+  return ok;
+}
+
+function fpBuildSummary(id) {
+  var d = fpCollect(id);
+  var el = document.getElementById('fp-summary-' + id);
+  if (!el) return;
+  el.innerHTML = 
+    '<div style="font-weight:700;margin-bottom:8px">Review Your Receipt</div>' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee"><span style="color:#888">Rep</span><span>' + esc(d.salesRep) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee"><span style="color:#888">Customer</span><span>' + esc(d.customerName) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee"><span style="color:#888">Company</span><span>' + esc(d.saleCompany) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee"><span style="color:#888">Products</span><span style="text-align:right;max-width:180px">' + esc((d.products||[]).join(', ')) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee"><span style="color:#888">Amount</span><span>$' + esc(d.transactionAmount) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="color:#888">Payment</span><span>' + esc(d.paymentNum) + ' of ' + esc(d.paymentOf) + ' · ' + esc(d.paymentMethod) + '</span></div>';
+}
+
+function fpCollect(id) {
+  var products = [], productNotes = {};
+  PRODUCTS.forEach(function(p) {
+    var cb = document.getElementById('fp-' + p.id + '-' + id);
+    if (cb && cb.checked) {
+      products.push(p.label);
+      if (p.hasNote) {
+        var ni = document.getElementById('fp-note-' + p.id + '-' + id);
+        if (ni && ni.value.trim()) productNotes[p.label] = ni.value.trim();
+      }
+    }
+  });
+  var coRadio  = document.querySelector('input[name="saleCompany-' + id + '"]:checked');
+  var payRadio = document.querySelector('input[name="payMethod-' + id + '"]:checked');
+  return {
+    salesRep:          document.getElementById('salesRep-' + id)?.value.trim() || '',
+    saleDate:          document.getElementById('saleDate-' + id)?.value || new Date().toISOString().slice(0,10),
+    customerName:      document.getElementById('customerName-' + id)?.value.trim() || '',
+    customerAddress:   document.getElementById('customerAddress-' + id)?.value.trim() || '',
+    customerCity:      document.getElementById('customerCity-' + id)?.value.trim() || '',
+    customerEmail:     document.getElementById('customerEmail-' + id)?.value.trim() || '',
+    products, productNotes,
+    saleCompany:       coRadio?.value || '',
+    saleCompanyOther:  document.getElementById('saleCompanyOther-' + id)?.value.trim() || '',
+    rebateDiscount:    document.getElementById('rebate-' + id)?.value.trim() || '',
+    transactionAmount: document.getElementById('amount-' + id)?.value.trim() || '',
+    paymentNum:        document.getElementById('paymentNum-' + id)?.value.trim() || '1',
+    paymentOf:         document.getElementById('paymentOf-' + id)?.value.trim() || '1',
+    paymentMethod:     payRadio?.value || '',
+    cardLast4:         document.getElementById('cardLast4-' + id)?.value.trim() || '',
+    cardExp:           document.getElementById('cardExp-' + id)?.value.trim() || '',
+    paymentPlan:       document.getElementById('plan-' + id)?.value.trim() || '',
+    salesNotes:        document.getElementById('notes-' + id)?.value.trim() || '',
+  };
+}
+
+async function fpSubmit(id) {
+  var data = fpCollect(id);
+  var btn = document.getElementById('fp-submit-btn-' + id);
+  btn.disabled = true;
+  btn.textContent = 'Generating PDF...';
+  try {
+    var res = await fetch('/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+      body: JSON.stringify(data)
+    });
+    var result = await res.json();
+    if (result.success) {
+      fpShowSuccess(result.id, data);
+    } else {
+      alert('Error: ' + (result.error || 'Unknown'));
+      btn.disabled = false;
+      btn.textContent = 'Submit & Generate PDF';
+    }
+  } catch(err) {
+    alert('Could not reach server.');
+    btn.disabled = false;
+    btn.textContent = 'Submit & Generate PDF';
+  }
+}
+
+function fpShowSuccess(id, data) {
+  var body = document.getElementById('form-panel-body');
+  var customerName = data.customerName || '—';
+  var parts = [];
+  parts.push('<div style="text-align:center;padding:24px 0 16px">');
+  parts.push('<div style="font-size:48px;margin-bottom:12px">✅</div>');
+  parts.push('<h2 style="font-size:20px;font-weight:700;margin-bottom:6px">Receipt Submitted!</h2>');
+  parts.push('<p style="color:#888;font-size:14px;margin-bottom:4px">' + esc(customerName) + '</p>');
+  parts.push('<p style="color:#888;font-size:13px;margin-bottom:20px">$' + esc(data.transactionAmount||'—') + ' · ' + esc(data.saleCompany||'—') + '</p>');
+  parts.push('</div>');
+  parts.push('<div style="padding:0 0 16px">');
+  parts.push('<div style="background:#f0f7ff;border:1px solid #c0d8f0;border-radius:10px;padding:14px;margin-bottom:12px">');
+  parts.push('<div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:6px">🔗 Signing Link</div>');
+  parts.push('<div id="fp-sig-link-' + id + '" style="font-size:12px;color:#1a6fa8;word-break:break-all;font-family:monospace;margin-bottom:10px;line-height:1.5">Generating...</div>');
+  parts.push('<div style="display:flex;gap:8px">');
+  parts.push('<button id="fp-copy-btn-' + id + '" data-sid="' + id + '" onclick="fpCopyLinkBtn(this)" style="flex:1;padding:10px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📋 Copy Link</button>');
+  parts.push('<button id="fp-mark-sent-' + id + '" data-sid="' + id + '" onclick="fpMarkSentBtn(this)" style="flex:1;padding:10px;background:transparent;border:1.5px solid #2c2c2c;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📤 Mark Sent</button>');
+  parts.push('</div></div>');
+  parts.push('<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">');
+  parts.push('<a href="/api/pdf/' + id + '" target="_blank" style="padding:11px;background:#c9a84c;color:#1a1a1a;border:none;border-radius:10px;font-size:13px;font-weight:700;text-align:center;text-decoration:none">⬇ Signed PDF</a>');
+  parts.push('<a href="/api/pdf/original/' + id + '" target="_blank" style="padding:11px;background:#555;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;text-align:center;text-decoration:none">📄 Unsigned</a>');
+  parts.push('</div>');
+  parts.push('<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">');
+  parts.push('<button data-sid="' + id + '" onclick="fpDuplicateBtn(this)" style="padding:11px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;font-size:13px;cursor:pointer">⧉ Duplicate</button>');
+  parts.push('<button onclick="closeFormPanel();loadSubs()" style="padding:11px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;font-size:13px;cursor:pointer">← Done</button>');
+  parts.push('</div></div>');
+  body.innerHTML = parts.join('');
+  document.getElementById('form-panel').scrollTop = 0;
+  fetch('/api/send-signature/' + id, { method:'POST', headers:{'Content-Type':'application/json','x-session-token':TOKEN}, body:'{}' })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) {
+        window._fpLastLink = result.signingLink;
+        var el = document.getElementById('fp-sig-link-' + id);
+        if (el) el.textContent = result.signingLink;
+        navigator.clipboard.writeText(result.signingLink).catch(function(){});
+      }
+    });
+  loadSubs();
+}
+
+function fpCopyLinkBtn(btn) {
+  var id = btn.getAttribute('data-sid');
+  fpCopyLink(id, btn);
+}
+function fpMarkSentBtn(btn) {
+  var id = btn.getAttribute('data-sid');
+  fpMarkSent(id, btn);
+}
+function fpCopyLink(id, btn) {
+  var el = document.getElementById('fp-sig-link-' + id);
+  var link = el ? el.textContent : window._fpLastLink;
+  if (link && link !== 'Generating...') {
+    navigator.clipboard.writeText(link).catch(function(){});
+    var btn = event.target;
+    var orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(function(){ btn.textContent = orig; }, 2000);
+  }
+}
+
+function fpMarkSent(id, btn) {
+  fetch('/api/submissions/' + id + '/mark-sent', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN }, body: '{}'
+  }).then(function(r){ return r.json(); })
+  .then(function(result){
+    if (result.success) {
+      btn.textContent = '✅ Sent ' + new Date(result.linkSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      btn.disabled = true;
+      btn.style.background = '#d4edda';
+      btn.style.color = '#155724';
+      btn.style.borderColor = '#c3e6cb';
+      loadSubs();
+    }
+  }).catch(function(e){ console.log('mark-sent error:', e); });
+}
+
+function fpDuplicateBtn(btn) {
+  var id = btn.getAttribute('data-sid');
+  fpDuplicate(id);
+}
+function fpDuplicate(id) {
+  var sub = allSubs.find(function(s){ return s.id === id; });
+  if (!sub) { closeFormPanel(); setTimeout(function(){ loadSubs(); }, 500); return; }
+  closeFormPanel();
+  setTimeout(function(){ openFormPanel(sub); }, 100);
+}
+</script>
+</body>
+</html>

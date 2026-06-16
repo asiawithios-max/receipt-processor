@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Receipt Processor</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #1a1a2e; min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.logo-wrap { margin-bottom: 28px; text-align: center; }
+.logo-wrap img { height: 64px; width: auto; object-fit: contain; }
+.login-card {
+  background: #fff; border-radius: 16px; padding: 36px 28px;
+  width: 100%; max-width: 380px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+}
+.login-card h1 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; text-align: center; }
+.login-card p  { font-size: 13px; color: #888; margin-bottom: 28px; text-align: center; }
+.field-group { margin-bottom: 16px; }
+.field-group label { display: block; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.field-group input {
+  width: 100%; padding: 13px 14px; border: 1.5px solid #dde1e7;
+  border-radius: 10px; font-size: 15px; color: #1a1a2e;
+  transition: border-color 0.2s;
+}
+.field-group input:focus { outline: none; border-color: #c9a84c; }
+.btn-login {
+  width: 100%; padding: 14px; background: #2c2c2c; color: #e0c97a;
+  font-size: 15px; font-weight: 700; border: none; border-radius: 10px;
+  cursor: pointer; margin-top: 8px; transition: background 0.2s;
+}
+.btn-login:hover { background: #444; }
+.btn-login:disabled { background: #ccc; color: #999; cursor: not-allowed; }
+.error-msg { color: #e74c3c; font-size: 13px; margin-top: 12px; text-align: center; display: none; }
+.version { color: #555; font-size: 11px; margin-top: 24px; text-align: center; }
+
+/* Change password screen */
+.change-pw-card {
+  background: #fff; border-radius: 16px; padding: 36px 28px;
+  width: 100%; max-width: 380px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+  display: none;
+}
+.change-pw-card h1 { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; text-align: center; }
+.change-pw-card p  { font-size: 13px; color: #888; margin-bottom: 24px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="logo-wrap">
+  <img src="/logos/joint.png" alt="Logo" onerror="this.style.display='none'">
+</div>
+
+<!-- Login form -->
+<div class="login-card" id="login-card">
+  <h1>Welcome Back</h1>
+  <p>Sign in to continue</p>
+  <div class="field-group">
+    <label>Full Name</label>
+    <input type="text" id="login-name" placeholder="Your full name" autocomplete="name">
+  </div>
+  <div class="field-group">
+    <label>Password</label>
+    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+  </div>
+  <button class="btn-login" id="login-btn">Sign In</button>
+  <p class="error-msg" id="login-error">Invalid name or password. Try again.</p>
+</div>
+
+<!-- Change password form -->
+<div class="change-pw-card" id="change-pw-card">
+  <h1>Set Your Password</h1>
+  <p>This is your first login. Please set a new password you'll remember.</p>
+  <div class="field-group">
+    <label>New Password</label>
+    <input type="password" id="new-password" placeholder="At least 6 characters">
+  </div>
+  <div class="field-group">
+    <label>Confirm Password</label>
+    <input type="password" id="confirm-password" placeholder="Repeat password">
+  </div>
+  <button class="btn-login" id="change-pw-btn">Set Password & Continue</button>
+  <p class="error-msg" id="change-pw-error"></p>
+</div>
+
+<p class="version">Receipt Processor · IOS / Limitless</p>
+
+<script>
+var pendingToken = null;
+var pendingUser  = null;
+
+document.getElementById('login-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('change-pw-btn').addEventListener('click', doChangePassword);
+
+// Check existing session - route immediately if valid
+var existingToken = localStorage.getItem('rp_token');
+var existingExpiry = localStorage.getItem('rp_expiry');
+var existingUser = JSON.parse(localStorage.getItem('rp_user') || '{}');
+if (existingToken && existingExpiry && new Date() < new Date(existingExpiry)) {
+  // Route immediately based on stored role, no server round trip needed
+  if (existingUser.role === 'superadmin') { window.location.href = '/dashboard'; }
+  else if (existingUser.role === 'rep') { window.location.href = '/rep'; }
+  else if (existingUser.role === 'cs') { window.location.href = '/cs'; }
+}
+
+function doLogin() {
+  var name     = document.getElementById('login-name').value.trim();
+  var password = document.getElementById('login-password').value;
+  var btn      = document.getElementById('login-btn');
+  var errEl    = document.getElementById('login-error');
+
+  if (!name || !password) { errEl.textContent = 'Please enter your name and password.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+  errEl.style.display = 'none';
+
+  fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, password: password })
+  }).then(function(r) { return r.json(); })
+  .then(function(result) {
+    if (result.success) {
+      if (result.user.mustChangePassword) {
+        // Show change password screen
+        pendingToken = result.token;
+        pendingUser  = result.user;
+        document.getElementById('login-card').style.display = 'none';
+        document.getElementById('change-pw-card').style.display = 'block';
+      } else {
+        saveSession(result.token, result.expiresAt, result.user);
+        routeUser(result.user, result.token);
+      }
+    } else {
+      errEl.textContent = result.error || 'Invalid name or password.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
+  }).catch(function() {
+    errEl.textContent = 'Could not connect. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  });
+}
+
+function doChangePassword() {
+  var newPw  = document.getElementById('new-password').value;
+  var confPw = document.getElementById('confirm-password').value;
+  var errEl  = document.getElementById('change-pw-error');
+  var btn    = document.getElementById('change-pw-btn');
+
+  if (newPw.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; return; }
+  if (newPw !== confPw)  { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  errEl.style.display = 'none';
+
+  fetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': pendingToken },
+    body: JSON.stringify({ newPassword: newPw })
+  }).then(function(r) { return r.json(); })
+  .then(function(result) {
+    if (result.success) {
+      pendingUser.mustChangePassword = false;
+      saveSession(pendingToken, new Date(Date.now() + 60*60*1000).toISOString(), pendingUser);
+      routeUser(pendingUser, pendingToken);
+    } else {
+      errEl.textContent = result.error || 'Error saving password.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Set Password & Continue';
+    }
+  }).catch(function() {
+    errEl.textContent = 'Could not connect.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Set Password & Continue';
+  });
+}
+
+function saveSession(token, expiresAt, user) {
+  localStorage.setItem('rp_token',    token);
+  localStorage.setItem('rp_expiry',   expiresAt);
+  localStorage.setItem('rp_user',     JSON.stringify(user));
+}
+
+function routeUser(user, token) {
+  if (user.role === 'superadmin') {
+    window.location.href = '/dashboard';
+  } else if (user.role === 'rep') {
+    window.location.href = '/rep';
+  } else if (user.role === 'cs') {
+    window.location.href = '/cs';
+  }
+}
+</script>
+</body>
+</html>

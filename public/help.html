@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Help & Instructions</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f5f7; color: #1a1a2e; min-height: 100vh; }
+header { background: #2c2c2c; padding: 14px 20px; display: flex; align-items: center; gap: 14px; }
+.header-logo { height: 40px; width: auto; object-fit: contain; }
+header h1 { color: #e0c97a; font-size: 17px; font-weight: 700; flex: 1; }
+.btn-back { padding: 8px 16px; background: transparent; border: 1.5px solid #e0c97a; color: #e0c97a; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 60px; }
+.tab-bar { display: flex; margin-bottom: 20px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.08); }
+.tab-btn { flex: 1; padding: 13px 8px; background: transparent; border: none; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 3px solid transparent; }
+.tab-btn.active { color: #1a1a2e; border-bottom-color: #c9a84c; background: #fffdf0; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.help-card { background: #fff; border-radius: 14px; padding: 22px; margin-bottom: 14px; box-shadow: 0 1px 8px rgba(0,0,0,0.07); }
+.help-card h2 { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
+.help-card h3 { font-size: 14px; font-weight: 600; color: #2c2c2c; margin: 14px 0 6px; }
+.help-card p { font-size: 14px; color: #555; line-height: 1.7; margin-bottom: 8px; }
+.help-card ul { padding-left: 18px; }
+.help-card ul li { font-size: 14px; color: #555; line-height: 1.8; }
+.step { display: flex; gap: 12px; margin-bottom: 14px; }
+.step-num { width: 28px; height: 28px; background: #2c2c2c; color: #e0c97a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+.step-body strong { font-size: 14px; color: #1a1a2e; display: block; margin-bottom: 2px; }
+.step-body span { font-size: 13px; color: #666; line-height: 1.6; }
+.faq-item { border-bottom: 1px solid #f0f0f0; padding: 14px 0; cursor: pointer; }
+.faq-item:last-child { border-bottom: none; }
+.faq-q { font-size: 14px; font-weight: 600; color: #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
+.faq-a { font-size: 13px; color: #666; line-height: 1.7; margin-top: 8px; display: none; }
+.faq-item.open .faq-a { display: block; }
+.faq-arrow { transition: transform 0.2s; font-size: 12px; }
+.faq-item.open .faq-arrow { transform: rotate(180deg); }
+.badge-demo { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-right: 4px; }
+.badge-unsent  { background: #f0f0f0; color: #888; }
+.badge-sent    { background: #fff3cd; color: #856404; }
+.badge-viewed  { background: #cfe2ff; color: #084298; }
+.badge-signed  { background: #d4edda; color: #155724; }
+.note { background: #fffdf0; border-left: 3px solid #c9a84c; padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 10px 0; font-size: 13px; color: #555; line-height: 1.6; }
+.role-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.role-rep { background: #e8f4fd; color: #1a6fa8; }
+.role-cs  { background: #f0f7f0; color: #2d6a2d; }
+.role-admin { background: #2c2c2c; color: #e0c97a; }
+</style>
+</head>
+<body>
+<header>
+  <img src="/logos/joint.png" class="header-logo" alt="Logo" onerror="this.style.display='none'">
+  <h1>Help & Instructions</h1>
+  <a href="#" class="btn-back" onclick="goBack()">← Back</a>
+</header>
+<main>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="btn-how-to" onclick="showTab('how-to')">📋 How To Use</button>
+    <button class="tab-btn" id="btn-features" onclick="showTab('features')">⚙️ Features</button>
+    <button class="tab-btn" id="btn-faq" onclick="showTab('faq')">❓ FAQ</button>
+  </div>
+
+  <!-- HOW TO USE -->
+  <div class="tab-content active" id="tab-how-to">
+
+    <div class="help-card">
+      <h2>🔐 Logging In</h2>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Go to the app URL</strong><span>You will be redirected to the login page automatically if you are not signed in.</span></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Enter your full name and password</strong><span>Use the exact name your account was created with. First login uses the temp password IOS2025! — you will be prompted to set your own password immediately.</span></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><strong>You are routed to your home page</strong><span>Sales reps go to the rep home. Customer service goes to the CS view. Super admins go to the dashboard.</span></div></div>
+      <div class="note">Sessions expire after 1 hour. A timer in the top right shows time remaining. You will be returned to the login page when it expires — nothing is lost.</div>
+    </div>
+
+    <div class="help-card">
+      <h2>📝 Creating a Receipt</h2>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Tap the + button</strong><span>From your rep home screen tap the gold + button in the bottom right corner to start a new receipt.</span></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Your name is pre-filled</strong><span>Your account name fills in automatically as the Sales Rep. You can edit it if needed for a co-sale.</span></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Set the sale date</strong><span>Defaults to today. Change it if the sale happened on a different day.</span></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Enter customer information</strong><span>Name, address, city/state/zip, and email.</span></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-body"><strong>Select sale company and products</strong><span>Choose IOS or Limitless. Select all products that apply. Some products have a notes field for terms or specifics.</span></div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-body"><strong>Enter payment details</strong><span>Amount (numbers only, no $ sign), payment method, card last 4 and expiration if credit or debit. Set payment # of # for payment plans.</span></div></div>
+      <div class="step"><div class="step-num">7</div><div class="step-body"><strong>Review and submit</strong><span>Step 4 shows a full summary. Review carefully then tap Submit and Generate PDF.</span></div></div>
+      <div class="step"><div class="step-num">8</div><div class="step-body"><strong>Copy the signing link</strong><span>The link auto-copies to your clipboard on the success screen. Text or email it to the customer immediately.</span></div></div>
+      <div class="step"><div class="step-num">9</div><div class="step-body"><strong>Mark as Sent</strong><span>After sending the link tap Mark Sent on the submission to record the timestamp permanently.</span></div></div>
+    </div>
+
+    <div class="help-card">
+      <h2>✍️ How the Customer Signs</h2>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Customer opens the link</strong><span>Works on any phone, tablet, or computer. No app or account needed.</span></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>They review the receipt</strong><span>All products, amount, payment info, and full terms and conditions.</span></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><strong>They draw their signature</strong><span>Using their finger or mouse in the signature box.</span></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><strong>They tap I Agree and Sign</strong><span>The signature is stamped onto the PDF with the date and a unique electronic signature ID.</span></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-body"><strong>They download their copy</strong><span>A Download Signed Receipt button appears so they can save their copy.</span></div></div>
+    </div>
+
+    <div class="help-card">
+      <h2>📊 Status Guide</h2>
+      <p><span class="badge-demo badge-unsent">Unsent</span> Receipt created, signing link not yet sent to customer</p>
+      <p style="margin-top:8px"><span class="badge-demo badge-sent">Sent</span> Link marked as sent, customer has not opened it yet</p>
+      <p style="margin-top:8px"><span class="badge-demo badge-viewed">Viewed</span> Customer opened the link but has not signed yet</p>
+      <p style="margin-top:8px"><span class="badge-demo badge-signed">Signed</span> Customer signed — PDF is complete and locked</p>
+      <p style="margin-top:10px;font-size:13px;color:#888">✅ CRM Confirmed — shown as a green badge when admin or CS has saved the signed receipt to the company CRM</p>
+    </div>
+
+  </div>
+
+  <!-- FEATURES -->
+  <div class="tab-content" id="tab-features">
+
+    <div class="help-card">
+      <h2>👥 Account Types</h2>
+      <h3><span class="role-badge role-rep">Sales Rep</span></h3>
+      <p>Submit receipts, see your own submissions, edit unsigned receipts, archive, get signing links, download PDFs.</p>
+      <h3><span class="role-badge role-cs">Customer Service</span></h3>
+      <p>Read-only view of all submissions. Copy signing links, download PDFs, mark CRM Confirmed. Cannot submit or edit.</p>
+      <h3><span class="role-badge role-admin">Super Admin</span></h3>
+      <p>Full access. Create and manage all accounts, see all submissions, confirm CRM, export data, delete submissions.</p>
+    </div>
+
+    <div class="help-card">
+      <h2>📄 PDF Types</h2>
+      <h3>⬇ Signed PDF</h3>
+      <p>Current version of the receipt. Includes customer signature if signed, blank signature line if not.</p>
+      <h3>📄 Unsigned PDF</h3>
+      <p>Always the blank template as originally submitted. No signature ever. Use this when you need a clean original copy.</p>
+    </div>
+
+    <div class="help-card">
+      <h2>🔗 Signing Link</h2>
+      <ul>
+        <li>Generated automatically when the receipt is submitted</li>
+        <li>Auto-copies to clipboard on the success screen</li>
+        <li>Always available in the Signing tab on the submission detail</li>
+        <li>The same link works every time — resend it anytime</li>
+        <li>Never expires</li>
+        <li>Shows Already Signed if the customer opens it after signing</li>
+      </ul>
+    </div>
+
+    <div class="help-card">
+      <h2>👁 Link Tracking</h2>
+      <p>Every time a customer opens the signing link it is automatically tracked. In the Signing tab of any submission you can see:</p>
+      <ul>
+        <li>When the link was first opened</li>
+        <li>When it was most recently viewed</li>
+        <li>How many times it has been opened</li>
+      </ul>
+      <p style="margin-top:8px">Status automatically updates from Sent to Viewed when the customer opens the link.</p>
+    </div>
+
+    <div class="help-card">
+      <h2>✏️ Edit Receipt</h2>
+      <p>You can edit a receipt after submission as long as it has NOT been signed. To edit:</p>
+      <ul>
+        <li>Open the submission detail</li>
+        <li>Tap the Edit button</li>
+        <li>Type EDIT in the prompt and tap OK</li>
+        <li>Change the fields you need</li>
+        <li>Tap Save Changes — PDF updates automatically</li>
+      </ul>
+      <div class="note">Locked fields: customer name, products, company, sale date. Once signed, editing is disabled entirely.</div>
+    </div>
+
+    <div class="help-card">
+      <h2>📤 Mark Sent</h2>
+      <p>After sending the signing link to the customer tap Mark Sent on the submission. This records a permanent timestamp. Cannot be changed once set.</p>
+    </div>
+
+    <div class="help-card">
+      <h2>🗄 Archive</h2>
+      <p>Archiving hides a submission from your main list but keeps it permanently in the admin dashboard. To archive tap the Archive button in the submission detail. To see archived submissions scroll to the bottom of your list and tap the Archived section. You can unarchive from there.</p>
+      <p style="margin-top:8px">You can also bulk archive — tap Select, check multiple submissions, then tap Archive Selected.</p>
+    </div>
+
+    <div class="help-card">
+      <h2>✅ CRM Confirmed</h2>
+      <p>After saving a signed receipt to the company CRM, admin or CS taps CRM Confirmed on the submission. A green CRM badge appears on the submission letting the rep know their sale has been fully processed.</p>
+    </div>
+
+    <div class="help-card">
+      <h2>⧉ Duplicate Form</h2>
+      <p>Creates a copy of a receipt with all fields pre-filled. Use when a customer pays with two cards, a sale involves both IOS and Limitless, or a customer makes a second purchase with similar products.</p>
+    </div>
+
+  </div>
+
+  <!-- FAQ -->
+  <div class="tab-content" id="tab-faq">
+    <div class="help-card">
+      <h2>❓ Frequently Asked Questions</h2>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">I forgot my password. What do I do? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Contact your admin to reset your password. They can reset it to the temp password from the dashboard. You will be prompted to set a new one on your next login.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">I made a mistake in the receipt. Can I fix it? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Yes — if the receipt has not been signed yet you can edit it yourself. Open the submission detail, tap Edit, type EDIT to confirm, make your changes, and save. The PDF updates automatically. If it has already been signed it is locked — contact admin.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">The customer needs the signing link again. How do I find it? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Find the submission in your list, tap it to open the detail, go to the Signing tab. The link is always there. Tap Copy Link and send it again.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What does Viewed mean? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Viewed means the customer has opened the signing link at least once but has not signed yet. It updates automatically the moment they open the link. You can see exactly when they last viewed it in the Signing tab.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What is CRM Confirmed? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">CRM Confirmed means admin or customer service has saved the signed receipt to the company CRM. It shows as a green badge on your submission so you know your sale has been fully processed without having to ask anyone.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What if the sale is for both IOS and Limitless? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Submit the receipt for one company first. On the success screen tap Duplicate Form. Change the company on the copy and adjust any other fields. Submit the duplicate. You will have two receipts and two signing links — send both to the customer.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What if a customer pays with two different cards? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Submit the first receipt with the first card and amount. Duplicate the form. Update the amount, card last 4, expiration, and payment number on the copy — for example Payment 2 of 2. Each card gets its own receipt and signing link.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">My session expired. Did I lose anything? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">No. All submitted receipts are saved permanently in the database the moment you submit. Signing links, signatures, and all data are safe. Just log in again and everything will be there.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">Can I use this on my phone? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Yes — the app works on any phone, tablet, or computer. In Safari on iPhone tap Share then Add to Home Screen to add it as an app icon for quick access.</div>
+      </div>
+
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What is the difference between Signed PDF and Unsigned PDF? <span class="faq-arrow">▼</span></div>
+        <div class="faq-a">Signed PDF is the current version — includes the customer signature if they have signed. Unsigned PDF is always the blank template as originally submitted with no signature. Use Unsigned PDF if you need the original receipt without any signature.</div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+<script>
+function goBack() {
+  var user = JSON.parse(localStorage.getItem('rp_user') || '{}');
+  if (user.role === 'superadmin') window.location.href = '/dashboard';
+  else if (user.role === 'cs') window.location.href = '/cs';
+  else window.location.href = '/rep';
+}
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(el){ el.classList.remove('active'); });
+  document.getElementById('tab-' + id).classList.add('active');
+  document.getElementById('btn-' + id).classList.add('active');
+}
+</script>
+</body>
+</html>

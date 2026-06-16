@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Receipt Processor</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f5f7; color: #1a1a2e; min-height: 100vh; }
+header { background: #5a5a5a; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.2); flex-wrap: wrap; gap: 10px; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo { height: 42px; width: auto; object-fit: contain; }
+header h1 { color: #fff; font-size: 18px; font-weight: 700; }
+header p { color: #e0c97a; font-size: 11px; margin-top: 1px; }
+.btn-new { padding: 9px 18px; background: #c9a84c; color: #1a1a1a; font-weight: 700; font-size: 13px; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.btn-new:hover { background: #b8943d; }
+.btn-export { padding: 9px 14px; background: transparent; border: 1.5px solid #e0c97a; color: #e0c97a; font-weight: 600; font-size: 13px; border-radius: 8px; white-space: nowrap; cursor: pointer; }
+.btn-export:hover { background: #e0c97a; color: #3a3a3a; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+.badge-unsigned { background:#f0f0f0; color:#888; }
+.badge-sent { background:#fff3cd; color:#856404; }
+.badge-signed { background:#d4edda; color:#155724; }
+#login-screen { display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+.login-card { background: #fff; border-radius: 14px; padding: 40px 32px; box-shadow: 0 2px 20px rgba(0,0,0,0.1); width: 100%; max-width: 360px; text-align: center; }
+.login-card h2 { font-size: 20px; color: #1a1a2e; margin-bottom: 6px; }
+.login-card p { font-size: 13px; color: #888; margin-bottom: 24px; }
+.login-card input { width: 100%; padding: 12px 14px; border: 1.5px solid #dde1e7; border-radius: 8px; font-size: 15px; margin-bottom: 14px; }
+.login-card input:focus { outline: none; border-color: #c9a84c; }
+.btn-login { width: 100%; padding: 13px; background: #2c2c2c; color: #e0c97a; font-size: 15px; font-weight: 700; border: none; border-radius: 10px; cursor: pointer; }
+.login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; display: none; }
+#dashboard-screen { display: block; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+.stats-bar { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+.stat-card { background: #fff; border-radius: 10px; padding: 16px 22px; box-shadow: 0 1px 8px rgba(0,0,0,0.07); flex: 1; min-width: 130px; }
+.stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 4px; }
+.stat-value { font-size: 26px; font-weight: 700; color: #1a1a2e; }
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.search-wrap { flex: 1; min-width: 200px; }
+.search-wrap input { width: 100%; padding: 11px 16px; border: 1.5px solid #dde1e7; border-radius: 8px; font-size: 14px; }
+.search-wrap input:focus { outline: none; border-color: #c9a84c; }
+.btn-bulk-delete { padding: 10px 18px; background: transparent; border: 1.5px solid #e74c3c; color: #e74c3c; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; display: none; }
+.btn-bulk-delete:hover { background: #e74c3c; color: #fff; }
+.btn-select-mode { padding: 10px 18px; background: transparent; border: 1.5px solid #888; color: #888; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn-select-mode:hover { border-color: #555; color: #555; }
+.table-wrap { background: #fff; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead { background: #2c2c2c; }
+thead th { padding: 13px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #e0c97a; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; cursor: pointer; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: #fffdf5; }
+tbody tr.selected-row { background: #fff8e1; }
+tbody td { padding: 13px 14px; font-size: 13px; color: #333; vertical-align: top; }
+.td-name { font-weight: 600; color: #1a1a2e; font-size: 14px; }
+.td-amount { font-weight: 700; color: #1a1a2e; white-space: nowrap; }
+.td-date { color: #999; font-size: 12px; white-space: nowrap; }
+.company-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #e8f4fd; color: #1a6fa8; }
+.company-badge.limitless { background: #fdf3e8; color: #b8650a; }
+.company-badge.other { background: #f3eefe; color: #6b3db5; }
+.btn-pdf { display: inline-block; padding: 5px 12px; background: #2c2c2c; color: #e0c97a; font-size: 11px; font-weight: 600; border-radius: 6px; text-decoration: none; white-space: nowrap; }
+.btn-pdf:hover { background: #444; }
+.empty-state { text-align: center; padding: 50px 20px; color: #bbb; }
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+#detail-panel { display: none; position: fixed; top: 0; right: 0; width: 100%; max-width: 500px; height: 100vh; background: #fff; box-shadow: -4px 0 24px rgba(0,0,0,0.15); z-index: 200; overflow-y: auto; flex-direction: column; }
+.detail-panel-header { background: #2c2c2c; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1; }
+.detail-panel-header h2 { color: #e0c97a; font-size: 16px; font-weight: 700; }
+.btn-close { background: transparent; border: 1.5px solid #e0c97a; color: #e0c97a; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-close:hover { background: #e0c97a; color: #2c2c2c; }
+.tab-bar { display: flex; border-bottom: 2px solid #f0f0f0; background: #fafafa; }
+.tab-btn { flex: 1; padding: 12px; background: transparent; border: none; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.tab-btn.active { color: #2c2c2c; border-bottom-color: #c9a84c; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.detail-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 20px; border-bottom: 1px solid #f0f0f0; font-size: 14px; gap: 16px; }
+.detail-row:last-child { border-bottom: none; }
+.detail-label { font-weight: 600; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; min-width: 100px; }
+.detail-value { color: #1a1a2e; text-align: right; word-break: break-word; }
+.sig-link-box { margin: 0 20px 16px; padding: 12px 14px; background: #f0f7ff; border: 1px solid #c0d8f0; border-radius: 8px; }
+.sig-link-box .sig-link-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.sig-link-box .sig-link-url { font-size: 12px; color: #1a6fa8; word-break: break-all; font-family: monospace; margin-bottom: 8px; }
+.sig-link-box .btn-copy-link { padding: 6px 16px; background: #2c2c2c; color: #e0c97a; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sig-link-box .btn-copy-link:hover { background: #444; }
+.edit-form { padding: 20px; }
+.edit-group { margin-bottom: 16px; }
+.edit-group label { display: block; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; }
+.edit-group input, .edit-group textarea, .edit-group select { width: 100%; padding: 10px 12px; border: 1.5px solid #dde1e7; border-radius: 8px; font-size: 14px; color: #1a1a2e; background: #fff; }
+.edit-group input:focus, .edit-group textarea:focus, .edit-group select:focus { outline: none; border-color: #c9a84c; }
+.edit-group textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+.edit-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.edit-products { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.edit-product-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1.5px solid #dde1e7; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.edit-product-item:has(input:checked) { border-color: #c9a84c; background: #fffdf0; }
+.edit-product-item input { accent-color: #c9a84c; flex-shrink: 0; }
+.detail-actions { padding: 16px 20px; border-top: 1px solid #eee; display: flex; gap: 10px; flex-wrap: wrap; position: sticky; bottom: 0; background: #fff; }
+.btn-dl { flex: 2; padding: 12px; background: #c9a84c; color: #1a1a1a; font-size: 14px; font-weight: 700; border-radius: 10px; text-decoration: none; text-align: center; }
+.btn-dl:hover { background: #b8943d; }
+.btn-save { flex: 2; padding: 12px; background: #2c2c2c; color: #e0c97a; font-size: 14px; font-weight: 700; border-radius: 10px; border: none; cursor: pointer; }
+.btn-save:hover { background: #444; }
+.btn-sign { flex: 2; padding: 12px; background: #1a6fa8; color: #fff; font-size: 14px; font-weight: 700; border-radius: 10px; border: none; cursor: pointer; white-space: nowrap; }
+.btn-sign:hover { background: #155d8e; }
+.btn-delete { flex: 1; padding: 12px; background: transparent; border: 1.5px solid #e74c3c; color: #e74c3c; font-size: 14px; font-weight: 700; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+.btn-delete:hover { background: #e74c3c; color: #fff; }
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 199; }
+#export-panel { display:none; background:#2c2c2c; padding:14px 20px; }
+.export-inner { max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.export-inner span { color:#e0c97a; font-size:13px; font-weight:600; }
+.export-inner input[type="date"] { padding:7px 10px; border-radius:6px; border:1px solid #555; background:#3a3a3a; color:#fff; font-size:13px; }
+.btn-export-dl { padding:8px 18px; background:#c9a84c; color:#1a1a1a; border:none; border-radius:6px; font-weight:700; font-size:13px; cursor:pointer; }
+.btn-export-all { padding:8px 18px; background:transparent; border:1.5px solid #e0c97a; color:#e0c97a; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer; }
+/* Bulk delete modal */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; align-items:center; justify-content:center; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:#fff; border-radius:14px; padding:32px; max-width:420px; width:90%; text-align:center; }
+.modal-box h3 { font-size:18px; color:#1a1a2e; margin-bottom:8px; }
+.modal-box p { font-size:14px; color:#666; margin-bottom:16px; line-height:1.5; }
+.modal-box input { width:100%; padding:12px; border:2px solid #e74c3c; border-radius:8px; font-size:15px; margin-bottom:16px; text-align:center; letter-spacing:2px; }
+.modal-box input:focus { outline:none; }
+.btn-confirm-delete { width:100%; padding:13px; background:#e74c3c; color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; }
+.btn-confirm-delete:disabled { background:#ccc; cursor:not-allowed; }
+.btn-cancel-delete { width:100%; padding:13px; background:transparent; border:1.5px solid #dde1e7; color:#888; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; }
+.filter-tabs { display:flex; gap:0; background:#fff; border-bottom:1px solid #eee; margin-bottom:16px; border-radius:12px 12px 0 0; overflow:hidden; flex-wrap:wrap; }
+.filter-tab-btn { flex:1; min-width:80px; padding:10px 8px; background:transparent; border:none; font-size:12px; font-weight:600; color:#888; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+.filter-tab-btn.active { color:#1a1a2e; border-bottom-color:#c9a84c; background:#fffdf5; }
+.filter-tab-btn:hover:not(.active) { color:#555; background:#f9f9f9; }
+.badge-viewed { background:#cfe2ff; color:#084298; }
+.badge-refunded { background:#ffe0e0; color:#c0392b; }
+.refund-callout { margin:12px 20px; padding:12px 14px; background:#fff3cd; border:1.5px solid #f0c040; border-radius:8px; }
+.refund-callout-title { font-size:11px; font-weight:700; color:#856404; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:4px; }
+.refund-callout-note { font-size:13px; color:#1a1a2e; line-height:1.5; }
+.refund-callout-meta { font-size:11px; color:#aaa; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <img src="/logos/joint.png" class="header-logo" alt="Logo" onerror="this.style.display='none'">
+    <div>
+      <h1>Receipt Dashboard</h1>
+      <p id="last-updated">Loading...</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button class="btn-export" onclick="toggleExport()">⬇ Export</button>
+    <button class="btn-new" style="background:#555;color:#e0c97a" onclick="toggleAccountsPanel()">👥 Accounts</button>
+    <button class="btn-new" style="background:transparent;border:1px solid #888;color:#888" onclick="doLogout()">Logout</button>
+
+  </div>
+</header>
+
+<!-- Login -->
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard-screen">
+  <div id="export-panel">
+    <div class="export-inner">
+      <span>Export Date Range:</span>
+      <input type="date" id="export-from">
+      <span style="color:#aaa">to</span>
+      <input type="date" id="export-to">
+      <button class="btn-export-dl" onclick="doExport()">Download CSV</button>
+      <button class="btn-export-all" onclick="doExportAll()">Export All</button>
+      <button onclick="toggleExport()" style="padding:8px 14px;background:transparent;border:none;color:#888;font-size:13px;cursor:pointer">✕</button>
+    </div>
+  </div>
+  <main>
+    <div class="stats-bar">
+      <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="stat-total">—</div></div>
+      <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value" id="stat-today">—</div></div>
+      <div class="stat-card"><div class="stat-label">This Week</div><div class="stat-value" id="stat-week">—</div></div>
+      <div class="stat-card"><div class="stat-label">Unsigned</div><div class="stat-value" id="stat-unsigned">—</div></div>
+      <div class="stat-card"><div class="stat-label">Unsent</div><div class="stat-value" id="stat-unsent">—</div></div>
+      <div class="stat-card"><div class="stat-label">Signed</div><div class="stat-value" id="stat-signed">—</div></div>
+      <div class="stat-card"><div class="stat-label">CRM Pending</div><div class="stat-value" id="stat-crm">—</div></div>
+    </div>
+    <div class="filter-tabs" id="filter-tabs">
+      <button class="filter-tab-btn active" onclick="setDashFilter('all',this)">All</button>
+      <button class="filter-tab-btn" onclick="setDashFilter('unsent',this)">Unsent</button>
+      <button class="filter-tab-btn" onclick="setDashFilter('sent',this)">Sent</button>
+      <button class="filter-tab-btn" onclick="setDashFilter('viewed',this)">Viewed</button>
+      <button class="filter-tab-btn" onclick="setDashFilter('signed',this)">Signed</button>
+      <button class="filter-tab-btn" onclick="setDashFilter('refunded',this)">Refunded</button>
+      <button class="filter-tab-btn" onclick="setDashFilter('crm-pending',this)">CRM Pending</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input type="text" id="search-input" placeholder="🔍  Search by customer name...">
+      </div>
+      <button class="btn-select-mode" id="select-mode-btn" onclick="toggleSelectMode()">☑ Select to Delete</button>
+      <button class="btn-bulk-delete" id="bulk-delete-btn" onclick="openBulkDeleteModal()">🗑 Delete Selected (<span id="selected-count">0</span>)</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th id="check-header" style="display:none;width:40px"><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+            <th>Sales Rep</th><th>Customer</th><th>Company</th><th>Amount</th><th>Status</th><th>Date</th><th>PDF</th>
+          </tr>
+        </thead>
+        <tbody id="submissions-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Accounts Panel -->
+<div id="accounts-panel" style="display:none;position:fixed;top:0;right:0;width:100%;max-width:480px;height:100vh;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:300;overflow-y:auto">
+  <div style="background:#2c2c2c;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0">
+    <h2 style="color:#e0c97a;font-size:16px;font-weight:700">👥 Account Management</h2>
+    <button onclick="toggleAccountsPanel()" style="background:transparent;border:1.5px solid #e0c97a;color:#e0c97a;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">✕ Close</button>
+  </div>
+  <div style="padding:20px">
+    <div style="margin-bottom:20px">
+      <h3 style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:12px">Create New Account</h3>
+      <input type="text" id="new-acct-name" placeholder="Full name" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px;margin-bottom:8px">
+      <select id="new-acct-role" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px;margin-bottom:8px">
+        <option value="rep">Sales Rep</option>
+        <option value="cs">Customer Service</option>
+        <option value="superadmin">Super Admin</option>
+      </select>
+      <input type="text" id="new-acct-pw" placeholder="Temp password (default: IOS2025!)" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px;margin-bottom:8px">
+      <button onclick="createAccount()" style="width:100%;padding:12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Create Account</button>
+      <p id="acct-msg" style="font-size:13px;margin-top:8px;text-align:center"></p>
+    </div>
+    <div>
+      <h3 style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:12px">All Accounts</h3>
+      <div id="accounts-list">Loading...</div>
+    </div>
+    <div style="margin-top:20px;padding:16px;background:#f8f9fa;border-radius:10px">
+      <h3 style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:8px">💾 Storage Health</h3>
+      <div id="storage-health">Loading...</div>
+    </div>
+  </div>
+</div>
+<div id="accounts-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:299" onclick="toggleAccountsPanel()"></div>
+
+<!-- Overlay -->
+<div class="overlay" id="overlay"></div>
+
+<!-- Detail panel -->
+<div id="detail-panel">
+  <div class="detail-panel-header">
+    <h2 id="panel-title">Details</h2>
+    <button class="btn-close" id="close-btn">✕ Close</button>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-view-btn">👁 View</button>
+    <button class="tab-btn" id="tab-edit-btn">✏️ Edit</button>
+  </div>
+  <div class="tab-content active" id="tab-view">
+    <div id="detail-body"></div>
+    <!-- Signing link box always shown in view tab -->
+    <div class="sig-link-box" id="sig-link-box" style="display:none">
+      <div class="sig-link-label">🔗 Signing Link</div>
+      <div class="sig-link-url" id="sig-link-url"></div>
+      <button class="btn-copy-link" onclick="copySigningLink()">Copy Link</button>
+    </div>
+    <!-- Refund callout -->
+    <div class="refund-callout" id="refund-callout" style="display:none">
+      <div class="refund-callout-title">💰 Refund Note</div>
+      <div class="refund-callout-note" id="refund-callout-note"></div>
+      <div class="refund-callout-meta" id="refund-callout-meta"></div>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-edit">
+    <div class="edit-form">
+      <div class="edit-group"><label>Sale Date</label><input type="date" id="edit-saleDate"></div>
+      <div class="edit-group"><label>Sales Rep</label><input type="text" id="edit-salesRep"></div>
+      <div class="edit-group"><label>Customer Name</label><input type="text" id="edit-customerName"></div>
+      <div class="edit-group"><label>Street Address</label><input type="text" id="edit-customerAddress"></div>
+      <div class="edit-two">
+        <div class="edit-group"><label>City, State ZIP</label><input type="text" id="edit-customerCity"></div>
+        <div class="edit-group"><label>Email</label><input type="text" id="edit-customerEmail"></div>
+      </div>
+      <div class="edit-group"><label>Sale Company</label>
+        <select id="edit-saleCompany"><option>IOS</option><option>Limitless</option><option>Other</option></select>
+      </div>
+      <div class="edit-group"><label>Products</label><div class="edit-products" id="edit-products-grid"></div></div>
+      <div class="edit-two">
+        <div class="edit-group"><label>Amount</label><input type="text" id="edit-transactionAmount"></div>
+        <div class="edit-group"><label>Payment Method</label>
+          <select id="edit-paymentMethod"><option></option><option>Credit Card</option><option>Debit Card</option><option>Cash</option><option>Check</option><option>Other</option></select>
+        </div>
+      </div>
+      <div class="edit-two">
+        <div class="edit-group"><label>Payment # of #</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="edit-paymentNum" style="width:60px;text-align:center">
+            <span style="color:#888;font-weight:600">of</span>
+            <input type="text" id="edit-paymentOf" style="width:60px;text-align:center">
+          </div>
+        </div>
+        <div class="edit-group"><label>Card Last 4 / Exp</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="edit-cardLast4" placeholder="Last 4" maxlength="4" style="width:70px">
+            <input type="text" id="edit-cardExp" placeholder="MM/YY" maxlength="5" style="width:70px">
+          </div>
+        </div>
+      </div>
+      <div class="edit-group"><label>Payment Plan</label><textarea id="edit-paymentPlan" rows="3"></textarea></div>
+      <div class="edit-group"><label>Rebate</label><input type="text" id="edit-rebateDiscount"></div>
+      <div class="edit-group"><label>Sales Notes</label><textarea id="edit-salesNotes" rows="3"></textarea></div>
+    </div>
+  </div>
+  <div class="detail-actions" id="detail-actions"></div>
+</div>
+
+<!-- Bulk delete modal -->
+<div class="modal-overlay" id="bulk-modal">
+  <div class="modal-box">
+    <h3>⚠️ Delete Selected Entries</h3>
+    <p>You are about to permanently delete <strong id="modal-count">0</strong> submissions.<br><br>Make sure you have exported your CSV and downloaded all signed PDFs before deleting.<br><br>Type <strong>DELETE ENTRIES</strong> to confirm:</p>
+    <input type="text" id="delete-confirm-input" placeholder="DELETE ENTRIES" oninput="checkDeleteConfirm()">
+    <button class="btn-confirm-delete" id="confirm-delete-btn" onclick="executeBulkDelete()" disabled>Delete Permanently</button>
+    <button class="btn-cancel-delete" onclick="closeBulkDeleteModal()">Cancel</button>
+  </div>
+</div>
+
+<script>
+var PASS = 'receipt2024'; // fallback
+var TOKEN = localStorage.getItem('rp_token');
+var USER  = JSON.parse(localStorage.getItem('rp_user') || '{}');
+var EXPIRY = localStorage.getItem('rp_expiry');
+if (!TOKEN || !EXPIRY || new Date() >= new Date(EXPIRY) || USER.role !== 'superadmin') {
+  window.location.href = '/login';
+}
+var PRODUCTS_LIST = ['Entity Filing (LLC)','Office Supplies ','Credit Boost','Business Funding Application','Hosting','Custom Domain Name','Business Consultation','Orientation Training','A.I Bot','Product Upgrade','Streaming Commercial','Advertisement Campaign','Other'];
+var allSubmissions = [];
+var currentId = null;
+var currentSigningLink = null;
+var selectMode = false;
+var selectedIds = [];
+var dashFilter = 'all';
+var searchTimer = null;
+
+// ── Boot ──────────────────────────────────────────────────
+document.getElementById('close-btn').addEventListener('click', closeDetail);
+document.getElementById('overlay').addEventListener('click', closeDetail);
+document.getElementById('search-input').addEventListener('input', filterTable);
+document.getElementById('tab-view-btn').addEventListener('click', function(){ switchTab('view'); });
+document.getElementById('tab-edit-btn').addEventListener('click', function(){ switchTab('edit'); });
+
+
+
+function loadSubmissions() {
+  // Also accept session-based login
+  var headers = {};
+  if (TOKEN && EXPIRY && new Date() < new Date(EXPIRY)) {
+    headers['x-session-token'] = TOKEN;
+  }
+  fetch('/api/submissions', { headers: headers })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      allSubmissions = data;
+      renderStats(data);
+      filterTable();
+      document.getElementById('last-updated').textContent = data.length + ' submissions — ' + new Date().toLocaleTimeString();
+    })
+    .catch(function(){
+      document.getElementById('submissions-tbody').innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">⚠️</div><p>Could not load.</p></div></td></tr>';
+    });
+}
+
+function renderStats(data) {
+  var now = new Date();
+  var todayStr = now.toISOString().slice(0,10);
+  var day = now.getDay();
+  var sow = new Date(now); sow.setDate(now.getDate()-day); sow.setHours(0,0,0,0);
+  document.getElementById('stat-total').textContent = data.length;
+  document.getElementById('stat-today').textContent = data.filter(function(s){ return s.timestamp.slice(0,10)===todayStr; }).length;
+  document.getElementById('stat-week').textContent = data.filter(function(s){ return new Date(s.timestamp)>=sow; }).length;
+  document.getElementById('stat-unsigned').textContent = data.filter(function(s){ var st=s.signatureStatus||'unsent'; return st==='sent'||st==='viewed'; }).length;
+  document.getElementById('stat-unsent').textContent = data.filter(function(s){ return (s.signatureStatus||'unsent')==='unsent'; }).length;
+  document.getElementById('stat-signed').textContent = data.filter(function(s){ return s.signatureStatus==='signed'; }).length;
+  document.getElementById('stat-crm').textContent = data.filter(function(s){ return s.signatureStatus==='signed' && !s.crmConfirmedAt; }).length;
+}
+
+function renderTable(data) {
+  var tbody = document.getElementById('submissions-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><p>No submissions yet.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(function(s) {
+    var date = new Date(s.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    var time = new Date(s.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    var company = s.saleCompany||'—';
+    var badge = company==='Limitless'?'limitless':company==='Other'?'other':'';
+    var status = s.archivedByRep ? 'archived' : (s.signatureStatus||'unsent');
+    var statusLabel = s.archivedByRep ? 'Archived' : status.charAt(0).toUpperCase()+status.slice(1);
+    var isSelected = selectedIds.indexOf(s.id) > -1;
+    var refundTag = s.refundNote ? ' <span class="badge badge-refunded" style="font-size:10px;vertical-align:middle">💰 Refund</span>' : '';
+    var rowClick = selectMode ? 'toggleRowSelect(\'' + s.id + '\', this)' : 'openDetail(\'' + s.id + '\')';
+    var cbClick  = 'event.stopPropagation();toggleRowSelect(\'' + s.id + '\', this.closest(\'tr\'))';
+    return '<tr onclick="' + rowClick + '" class="' + (isSelected?'selected-row':'') + '">' +
+      '<td id="check-col-' + s.id + '" style="display:' + (selectMode?'table-cell':'none') + '"><input type="checkbox" ' + (isSelected?'checked':'') + ' onclick="' + cbClick + '"></td>' +
+      '<td style="font-size:12px;color:#888">' + esc(s.salesRep||'—') + '</td>' +
+      '<td class="td-name">' + esc(s.customerName||'—') + refundTag + '</td>' +
+      '<td><span class="company-badge ' + badge + '">' + esc(company) + '</span></td>' +
+      '<td class="td-amount">' + esc(s.transactionAmount||'—') + '</td>' +
+      '<td><span class="badge badge-' + status + '">' + statusLabel + '</span></td>' +
+      '<td class="td-date">' + date + '<br><span style="color:#ccc">' + time + '</span></td>' +
+      '<td onclick="event.stopPropagation()"><a class="btn-pdf" href="/api/pdf/' + s.id + '" target="_blank">⬇ PDF</a> <a class="btn-pdf" href="/api/pdf/original/' + s.id + '" target="_blank" style="background:#555;margin-top:4px;display:inline-block">📄 Orig</a></td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ── Select mode ───────────────────────────────────────────
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds = [];
+  document.getElementById('select-mode-btn').textContent = selectMode ? '✕ Cancel Select' : '☑ Select to Delete';
+  document.getElementById('select-mode-btn').style.borderColor = selectMode ? '#e74c3c' : '#888';
+  document.getElementById('select-mode-btn').style.color = selectMode ? '#e74c3c' : '#888';
+  document.getElementById('bulk-delete-btn').style.display = selectMode ? 'block' : 'none';
+  document.getElementById('check-header').style.display = selectMode ? 'table-cell' : 'none';
+  updateSelectedCount();
+  renderTable(allSubmissions);
+}
+
+function toggleRowSelect(id, row) {
+  var idx = selectedIds.indexOf(id);
+  if (idx > -1) {
+    selectedIds.splice(idx, 1);
+    row.classList.remove('selected-row');
+  } else {
+    selectedIds.push(id);
+    row.classList.add('selected-row');
+  }
+  updateSelectedCount();
+}
+
+function toggleSelectAll() {
+  var all = document.getElementById('select-all').checked;
+  selectedIds = all ? allSubmissions.map(function(s){ return s.id; }) : [];
+  updateSelectedCount();
+  renderTable(allSubmissions);
+}
+
+function updateSelectedCount() {
+  document.getElementById('selected-count').textContent = selectedIds.length;
+}
+
+function openBulkDeleteModal() {
+  if (selectedIds.length === 0) { alert('No submissions selected.'); return; }
+  document.getElementById('modal-count').textContent = selectedIds.length;
+  document.getElementById('delete-confirm-input').value = '';
+  document.getElementById('confirm-delete-btn').disabled = true;
+  document.getElementById('bulk-modal').classList.add('active');
+}
+
+function closeBulkDeleteModal() {
+  document.getElementById('bulk-modal').classList.remove('active');
+}
+
+function checkDeleteConfirm() {
+  var val = document.getElementById('delete-confirm-input').value;
+  document.getElementById('confirm-delete-btn').disabled = (val !== 'DELETE ENTRIES');
+}
+
+function executeBulkDelete() {
+  var ids = selectedIds.slice();
+  var done = 0;
+  var total = ids.length;
+  closeBulkDeleteModal();
+  ids.forEach(function(id) {
+    fetch('/api/submissions/'+id, { method:'DELETE' })
+      .then(function(){ done++; if (done===total) { selectedIds=[]; toggleSelectMode(); loadSubmissions(); } })
+      .catch(function(){ done++; if (done===total) { loadSubmissions(); } });
+  });
+}
+
+// ── Detail panel ──────────────────────────────────────────
+function openDetail(id) {
+  if (selectMode) return;
+  var s = allSubmissions.find(function(x){ return x.id===id; });
+  if (!s) return;
+  currentId = s.id;
+  currentSigningLink = null;
+
+  var date = new Date(s.timestamp).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  var status = s.signatureStatus||'unsent';
+  var statusLabel = status==='unsent'?'Unsent':status==='sent'?'Sent':status==='viewed'?'Viewed':status==='signed'?'Signed':status.charAt(0).toUpperCase()+status.slice(1);
+
+  document.getElementById('detail-body').innerHTML =
+    row('Sales Rep', s.salesRep) +
+    row('Customer', s.customerName) +
+    row('Address', s.customerAddress) +
+    row('City / ZIP', s.customerCity) +
+    row('Email', s.customerEmail) +
+    '<div class="detail-row"><span class="detail-label">Signature</span><span class="detail-value"><span class="badge badge-'+status+'">'+statusLabel+'</span>'+(s.signedAt?' — '+new Date(s.signedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'')+' </span></div>' +
+    row('Sale Date', s.saleDate||s.timestamp.slice(0,10)) +
+    row('Company', s.saleCompany) +
+    row('Products', (s.products||[]).join(', ')) +
+    row('Amount', s.transactionAmount) +
+    row('Payment', (s.paymentNum||'1')+' of '+(s.paymentOf||'1')+' · '+(s.paymentMethod||'—')+(s.cardLast4?' · xxxx-'+s.cardLast4:'')) +
+    row('Exp', s.cardExp) +
+    row('Payment Plan', s.paymentPlan) +
+    row('Rebate', s.rebateDiscount) +
+    row('Sales Notes', s.salesNotes) +
+    row('Submitted', date) +
+    (s.lastEditedBy ? rowHtml('Last Edit', '<span style="color:#888;font-size:12px">By ' + esc(s.lastEditedBy) + ' on ' + new Date(s.lastEditedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>') : '') +
+    (s.linkSentAt ? rowHtml('Link Sent', '<span style="color:#555;font-size:12px">' + new Date(s.linkSentAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) + '</span>') : rowHtml('Link Sent','<span style="color:#aaa">Not yet sent</span>')) +
+    (s.linkOpenedAt ? rowHtml('First Opened', '<span style="color:#5aacff;font-size:12px">' + new Date(s.linkOpenedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) + '</span>') : rowHtml('First Opened','<span style="color:#aaa">Never opened</span>')) +
+    (s.linkViewCount ? rowHtml('Views', '<span style="color:#5aacff">'+s.linkViewCount+'</span>') : '') +
+    (s.signedAt ? rowHtml('Signed On', '<span style="color:#28a745;font-size:12px">' + new Date(s.signedAt).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) + '</span>') : '') +
+    (s.crmConfirmedAt ? rowHtml('CRM Confirmed', '<span style="color:#28a745">✅ ' + esc(s.crmConfirmedBy||'Admin') + ' · ' + new Date(s.crmConfirmedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>') : rowHtml('CRM Confirmed','<span style="color:#aaa">Not yet confirmed</span>')) +
+    (s.archivedByRep ? rowHtml('Archived', '<span class="badge badge-archived">Archived by Rep</span> <button onclick="unarchiveSubmission()" style="margin-left:8px;padding:4px 10px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:6px;font-size:11px;cursor:pointer">Unarchive</button>') : '');
+
+  // Refund callout
+  var refundBox = document.getElementById('refund-callout');
+  if (s.refundNote) {
+    document.getElementById('refund-callout-note').textContent = s.refundNote;
+    document.getElementById('refund-callout-meta').textContent = 'By ' + (s.refundedBy||'Admin') + (s.refundedAt ? ' · ' + new Date(s.refundedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '');
+    refundBox.style.display = 'block';
+  } else {
+    refundBox.style.display = 'none';
+  }
+
+  // Always show/generate signing link
+  showSigningLink(s);
+
+  // Populate edit fields
+  document.getElementById('edit-saleDate').value = s.saleDate||s.timestamp.slice(0,10)||'';
+  document.getElementById('edit-salesRep').value = s.salesRep||'';
+  document.getElementById('edit-customerName').value = s.customerName||'';
+  document.getElementById('edit-customerAddress').value = s.customerAddress||'';
+  document.getElementById('edit-customerCity').value = s.customerCity||'';
+  document.getElementById('edit-customerEmail').value = s.customerEmail||'';
+  document.getElementById('edit-saleCompany').value = s.saleCompany||'IOS';
+  document.getElementById('edit-transactionAmount').value = s.transactionAmount||'';
+  document.getElementById('edit-paymentMethod').value = s.paymentMethod||'';
+  document.getElementById('edit-paymentNum').value = s.paymentNum||'1';
+  document.getElementById('edit-paymentOf').value = s.paymentOf||'1';
+  document.getElementById('edit-cardLast4').value = s.cardLast4||'';
+  document.getElementById('edit-cardExp').value = s.cardExp||'';
+  document.getElementById('edit-paymentPlan').value = s.paymentPlan||'';
+  document.getElementById('edit-rebateDiscount').value = s.rebateDiscount||'';
+  document.getElementById('edit-salesNotes').value = s.salesNotes||'';
+
+  var selected = s.products||[];
+  document.getElementById('edit-products-grid').innerHTML = PRODUCTS_LIST.map(function(p){
+    return '<label class="edit-product-item"><input type="checkbox" value="'+esc(p)+'"'+(selected.indexOf(p)>-1?' checked':'')+'>'+esc(p)+'</label>';
+  }).join('');
+
+  document.getElementById('panel-title').textContent = s.customerName||'Submission';
+  switchTab('view');
+  document.getElementById('detail-panel').style.display = 'flex';
+  document.getElementById('overlay').style.display = 'block';
+}
+
+function showSigningLink(s) {
+  var box = document.getElementById('sig-link-box');
+  var urlEl = document.getElementById('sig-link-url');
+  if (s.signatureToken) {
+    // Already has a token — show it
+    currentSigningLink = window.location.origin + '/sign/' + s.signatureToken;
+    urlEl.textContent = currentSigningLink;
+    box.style.display = 'block';
+  } else {
+    // Generate a new token
+    box.style.display = 'none';
+    urlEl.textContent = 'Generating...';
+    fetch('/api/send-signature/'+s.id, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+      .then(function(r){ return r.json(); })
+      .then(function(result){
+        if (result.success) {
+          currentSigningLink = result.signingLink;
+          urlEl.textContent = currentSigningLink;
+          box.style.display = 'block';
+          // Update local data
+          var found = allSubmissions.find(function(x){ return x.id===s.id; });
+          if (found) { found.signatureToken = result.signingLink.split('/sign/')[1]; found.signatureStatus = found.signatureStatus||'sent'; }
+        }
+      })
+      .catch(function(){ urlEl.textContent = 'Could not generate link.'; box.style.display = 'block'; });
+  }
+}
+
+function copySigningLink() {
+  if (!currentSigningLink) return;
+  navigator.clipboard.writeText(currentSigningLink).catch(function(){});
+  var btn = document.querySelector('.btn-copy-link');
+  if (btn) { btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = 'Copy Link'; }, 2000); }
+}
+
+function row(label, val) {
+  return '<div class="detail-row"><span class="detail-label">'+label+'</span><span class="detail-value">'+esc(val||'—')+'</span></div>';
+}
+
+function rowHtml(label, html) {
+  return '<div class="detail-row"><span class="detail-label">'+label+'</span><span class="detail-value">'+html+'</span></div>';
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').style.display = 'none';
+  document.getElementById('overlay').style.display = 'none';
+  currentId = null;
+  currentSigningLink = null;
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-view').classList.toggle('active', tab==='view');
+  document.getElementById('tab-edit').classList.toggle('active', tab==='edit');
+  document.getElementById('tab-view-btn').classList.toggle('active', tab==='view');
+  document.getElementById('tab-edit-btn').classList.toggle('active', tab==='edit');
+  var actions = document.getElementById('detail-actions');
+  var pdfHref = '/api/pdf/'+(currentId||'');
+  if (tab==='view') {
+    var origHref = '/api/pdf/original/'+(currentId||'');
+    var s = allSubmissions.find(function(x){ return x.id===currentId; });
+    var crmBtn = s && !s.crmConfirmedAt ? '<button class="btn-sign" style="background:#28a745;flex:1" onclick="confirmCRM(\'' + currentId + '\')">✅ CRM</button>' : '';
+    var s2 = allSubmissions.find(function(x){ return x.id===currentId; });
+    var refundBtn = s2 && !s2.refundNote
+      ? '<button class="btn-sign" style="background:#e67e22;flex:1" onclick="openRefundModal()">💰 Refund</button>'
+      : (s2 && s2.refundNote ? '<button class="btn-sign" style="background:#999;flex:1" onclick="clearRefund()">✕ Refund</button>' : '');
+    var statusSel = '<select onchange="setStatusOverride(this.value)" style="padding:10px 8px;border:1.5px solid #dde1e7;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;flex:1">' +
+      '<option value="">Set Status…</option>' +
+      ['unsent','sent','signed'].map(function(v){ return '<option value="'+v+'"'+(s2&&s2.signatureStatus===v?' selected':'')+'>'+v.charAt(0).toUpperCase()+v.slice(1)+'</option>'; }).join('') +
+      '</select>';
+    actions.innerHTML =
+      '<a class="btn-dl" href="'+pdfHref+'" target="_blank">⬇ Signed PDF</a>' +
+      '<a class="btn-dl" href="'+origHref+'" target="_blank" style="background:#555;flex:1">📄 Unsigned</a>' +
+      '<button class="btn-sign" onclick="getSigningLink()">🔗 Link</button>' +
+      crmBtn +
+      refundBtn +
+      statusSel +
+      '<button class="btn-delete" onclick="deleteSubmission()">🗑 Delete</button>';
+  } else {
+    actions.innerHTML =
+      '<button class="btn-save" onclick="saveEdit()">💾 Save Changes</button>' +
+      '<button class="btn-delete" onclick="deleteSubmission()">🗑 Delete</button>';
+  }
+}
+
+function getSigningLink() {
+  if (!currentId) return;
+  if (currentSigningLink) {
+    navigator.clipboard.writeText(currentSigningLink).catch(function(){});
+    alert('Copied!\n\n'+currentSigningLink);
+    return;
+  }
+  fetch('/api/send-signature/'+currentId, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) {
+        currentSigningLink = result.signingLink;
+        document.getElementById('sig-link-url').textContent = currentSigningLink;
+        document.getElementById('sig-link-box').style.display = 'block';
+        navigator.clipboard.writeText(currentSigningLink).catch(function(){});
+        alert('Copied!\n\n'+currentSigningLink);
+        loadSubmissions();
+      } else {
+        alert('Error: '+(result.error||'Unknown'));
+      }
+    })
+    .catch(function(){ alert('Could not reach server.'); });
+}
+
+function saveEdit() {
+  if (!currentId) return;
+  var products = [];
+  document.querySelectorAll('#edit-products-grid input:checked').forEach(function(cb){ products.push(cb.value); });
+  var updated = {
+    saleDate: document.getElementById('edit-saleDate').value,
+    salesRep: document.getElementById('edit-salesRep').value,
+    customerName: document.getElementById('edit-customerName').value,
+    customerAddress: document.getElementById('edit-customerAddress').value,
+    customerCity: document.getElementById('edit-customerCity').value,
+    customerEmail: document.getElementById('edit-customerEmail').value,
+    saleCompany: document.getElementById('edit-saleCompany').value,
+    products: products,
+    transactionAmount: document.getElementById('edit-transactionAmount').value,
+    paymentMethod: document.getElementById('edit-paymentMethod').value,
+    paymentNum: document.getElementById('edit-paymentNum').value,
+    paymentOf: document.getElementById('edit-paymentOf').value,
+    cardLast4: document.getElementById('edit-cardLast4').value,
+    cardExp: document.getElementById('edit-cardExp').value,
+    paymentPlan: document.getElementById('edit-paymentPlan').value,
+    rebateDiscount: document.getElementById('edit-rebateDiscount').value,
+    salesNotes: document.getElementById('edit-salesNotes').value,
+  };
+  fetch('/api/submissions/'+currentId, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated) })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) { closeDetail(); loadSubmissions(); }
+      else { alert('Save failed: '+(result.error||'Unknown')); }
+    })
+    .catch(function(){ alert('Could not reach server.'); });
+}
+
+function deleteSubmission() {
+  if (!currentId) return;
+  if (!confirm('Delete this submission? This cannot be undone.')) return;
+  fetch('/api/submissions/'+currentId, { method:'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) { closeDetail(); loadSubmissions(); }
+      else { alert('Delete failed: '+(result.error||'Unknown')); }
+    })
+    .catch(function(){ alert('Could not reach server.'); });
+}
+
+function setDashFilter(f, el) {
+  dashFilter = f;
+  document.querySelectorAll('.filter-tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  filterTable();
+}
+
+function setStatusOverride(status) {
+  if (!currentId || !status) return;
+  fetch('/api/submissions/'+currentId+'/set-status', {
+    method:'POST', headers:{'Content-Type':'application/json','x-session-token':TOKEN},
+    body:JSON.stringify({status:status})
+  }).then(function(r){ return r.json(); }).then(function(result){
+    if (result.success) {
+      var found = allSubmissions.find(function(x){ return x.id===currentId; });
+      if (found) found.signatureStatus = status;
+      loadSubmissions();
+      openDetail(currentId);
+    } else { alert('Error: '+(result.error||'Unknown')); }
+  }).catch(function(){ alert('Could not reach server.'); });
+}
+
+function openRefundModal() {
+  var note = prompt('Enter refund note (amount, reason, date, etc.):');
+  if (!note || !note.trim()) return;
+  fetch('/api/submissions/'+currentId+'/refund', {
+    method:'POST', headers:{'Content-Type':'application/json','x-session-token':TOKEN},
+    body:JSON.stringify({refundNote:note.trim()})
+  }).then(function(r){ return r.json(); }).then(function(result){
+    if (result.success) { loadSubmissions(); openDetail(currentId); }
+    else { alert('Error: '+(result.error||'Unknown')); }
+  }).catch(function(){ alert('Could not reach server.'); });
+}
+
+function clearRefund() {
+  if (!confirm('Remove refund note from this submission?')) return;
+  fetch('/api/submissions/'+currentId+'/refund', {
+    method:'DELETE', headers:{'x-session-token':TOKEN}
+  }).then(function(r){ return r.json(); }).then(function(result){
+    if (result.success) { loadSubmissions(); openDetail(currentId); }
+    else { alert('Error: '+(result.error||'Unknown')); }
+  }).catch(function(){ alert('Could not reach server.'); });
+}
+
+function filterTable() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function() {
+    var q = document.getElementById('search-input').value.toLowerCase().trim();
+    var filtered = allSubmissions.filter(function(s) {
+      var matchQ = !q || (s.customerName||'').toLowerCase().includes(q)
+        || (s.salesRep||'').toLowerCase().includes(q)
+        || (s.customerEmail||'').toLowerCase().includes(q)
+        || (s.salesNotes||'').toLowerCase().includes(q);
+      var st = s.signatureStatus || 'unsent';
+      var matchF = dashFilter === 'all'
+        || (dashFilter === 'refunded' && s.refundNote)
+        || (dashFilter === 'crm-pending' && !s.crmConfirmedAt)
+        || st === dashFilter;
+      return matchQ && matchF;
+    });
+    renderTable(filtered);
+  }, 200);
+}
+
+function toggleExport() {
+  var p = document.getElementById('export-panel');
+  p.style.display = p.style.display==='none'?'block':'none';
+  if (p.style.display==='block') {
+    var now = new Date();
+    var sun = new Date(now); sun.setDate(now.getDate()-now.getDay());
+    var sat = new Date(sun); sat.setDate(sun.getDate()+6);
+    document.getElementById('export-from').value = sun.toISOString().slice(0,10);
+    document.getElementById('export-to').value = sat.toISOString().slice(0,10);
+  }
+}
+
+function doExport() {
+  var from = document.getElementById('export-from').value;
+  var to = document.getElementById('export-to').value;
+  window.location.href = '/api/export/range?from='+from+'&to='+to;
+}
+
+function doExportAll() { window.location.href = '/api/export/range'; }
+
+function unarchiveSubmission() {
+  if (!currentId) return;
+  fetch('/api/submissions/' + currentId + '/unarchive', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) { closeDetail(); loadSubmissions(); }
+      else { alert('Error: '+(result.error||'Unknown')); }
+    }).catch(function(){ alert('Could not reach server.'); });
+}
+
+function doLogout() {
+  var token = localStorage.getItem('rp_token');
+  fetch('/api/auth/logout', { method:'POST', headers:{'x-session-token': token||''} })
+    .finally(function(){ localStorage.clear(); window.location.href = '/login'; });
+}
+
+function toggleAccountsPanel() {
+  var panel = document.getElementById('accounts-panel');
+  var overlay = document.getElementById('accounts-overlay');
+  var showing = panel.style.display !== 'none';
+  panel.style.display = showing ? 'none' : 'block';
+  overlay.style.display = showing ? 'none' : 'block';
+  if (!showing) { loadAccounts(); loadStorageHealth(); }
+}
+
+function loadAccounts() {
+  var headers = {'x-dashboard-password': 'receipt2024'}; if (TOKEN) headers['x-session-token'] = TOKEN;
+  fetch('/api/admin/accounts', { headers: headers })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (!Array.isArray(data)) { document.getElementById('accounts-list').innerHTML = '<p style="color:#e74c3c;font-size:13px">Could not load accounts. Super admin login required.</p>'; return; }
+      var roles = { rep: 'Sales Rep', cs: 'Customer Service', superadmin: 'Super Admin' };
+      document.getElementById('accounts-list').innerHTML = data.map(function(a) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f8f9fa;border-radius:8px;margin-bottom:8px">' +
+          '<div><div style="font-size:14px;font-weight:600;color:#1a1a2e">'+esc(a.name)+'</div>' +
+          '<div style="font-size:11px;color:#888">'+esc(roles[a.role]||a.role)+(a.active?'':' · Inactive')+(a.lastLoginAt?' · Last login '+new Date(a.lastLoginAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):' · Never logged in')+'</div></div>' +
+          '<div style="display:flex;gap:6px">' +
+          '<button onclick="resetPassword(\'' + a.id + '\')" style="padding:5px 10px;background:transparent;border:1px solid #dde1e7;border-radius:6px;font-size:11px;cursor:pointer">Reset PW</button>' +
+          '<button onclick="toggleActive(\'' + a.id + '\',' + (!a.active) + ')" style="padding:5px 10px;background:transparent;border:1px solid ' + (a.active?'#e74c3c':'#28a745') + ';color:' + (a.active?'#e74c3c':'#28a745') + ';border-radius:6px;font-size:11px;cursor:pointer">' + (a.active?'Deactivate':'Activate') + '</button>' +
+          '<button onclick="deleteAccount(\'' + a.id + '\',\'' + esc(a.name) + '\')" style="padding:5px 10px;background:#e74c3c;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">Delete</button>' +
+          '</div></div>';
+      }).join('');
+    }).catch(function(){ document.getElementById('accounts-list').innerHTML = '<p style="color:#e74c3c;font-size:13px">Error loading accounts.</p>'; });
+}
+
+function loadStorageHealth() {
+  var headers = {'x-dashboard-password': 'receipt2024'}; if (TOKEN) headers['x-session-token'] = TOKEN;
+  fetch('/api/admin/storage-health', { headers: headers })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var pct = parseFloat(data.pct);
+      var color = pct > 80 ? '#e74c3c' : pct > 60 ? '#f0c040' : '#28a745';
+      document.getElementById('storage-health').innerHTML =
+        '<div style="font-size:13px;color:#555;margin-bottom:8px">'+data.usedMB+'MB used of '+data.limitMB+'MB ('+data.pct+'%)</div>' +
+        '<div style="background:#eee;border-radius:4px;height:8px"><div style="background:'+color+';width:'+Math.min(pct,100)+'%;height:8px;border-radius:4px"></div></div>' +
+        (pct > 70 ? '<p style="font-size:12px;color:#e74c3c;margin-top:6px">⚠️ Consider archiving old signed submissions.</p>' : '');
+    }).catch(function(){ document.getElementById('storage-health').innerHTML = '<p style="color:#aaa;font-size:13px">Could not load storage info.</p>'; });
+}
+
+function createAccount() {
+  var name = document.getElementById('new-acct-name').value.trim();
+  var role = document.getElementById('new-acct-role').value;
+  var pw   = document.getElementById('new-acct-pw').value.trim() || 'IOS2025!';
+  var msg  = document.getElementById('acct-msg');
+  if (!name) { msg.style.color='#e74c3c'; msg.textContent='Name is required.'; return; }
+  var headers = {'Content-Type':'application/json'};
+  if (TOKEN) headers['x-session-token'] = TOKEN;
+  fetch('/api/admin/accounts', { method:'POST', headers: headers, body: JSON.stringify({name:name,role:role,password:pw}) })
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      if (result.success) {
+        msg.style.color='#28a745'; msg.textContent='Account created! Temp password: '+pw;
+        document.getElementById('new-acct-name').value='';
+        document.getElementById('new-acct-pw').value='';
+        loadAccounts();
+      } else { msg.style.color='#e74c3c'; msg.textContent=result.error||'Error creating account.'; }
+    });
+}
+
+function resetPassword(id) {
+  if (!confirm('Reset this account password to IOS2025!?')) return;
+  var headers = {'Content-Type':'application/json'};
+  if (TOKEN) headers['x-session-token'] = TOKEN;
+  fetch('/api/admin/accounts/'+id, { method:'PATCH', headers: headers, body: JSON.stringify({resetPassword:true}) })
+    .then(function(r){ return r.json(); })
+    .then(function(result){ if (result.success) { alert('Password reset to IOS2025!'); loadAccounts(); } });
+}
+
+function toggleActive(id, active) {
+  var headers = {'Content-Type':'application/json'};
+  if (TOKEN) headers['x-session-token'] = TOKEN;
+  fetch('/api/admin/accounts/'+id, { method:'PATCH', headers: headers, body: JSON.stringify({active:active}) })
+    .then(function(r){ return r.json(); })
+    .then(function(result){ if (result.success) loadAccounts(); });
+}
+
+function deleteAccount(id, name) {
+  if (!confirm('Delete account for '+name+'? This cannot be undone.')) return;
+  var headers = {'Content-Type':'application/json'};
+  if (TOKEN) headers['x-session-token'] = TOKEN;
+  fetch('/api/admin/accounts/'+id, { method:'DELETE', headers: headers })
+    .then(function(r){ return r.json(); })
+    .then(function(result){ if (result.success) loadAccounts(); });
+}
+
+function confirmCRM(id) {
+  var headers = {'Content-Type':'application/json'};
+  if (TOKEN) headers['x-session-token'] = TOKEN;
+  fetch('/api/submissions/'+id+'/confirm-crm', { method:'POST', headers: headers, body:'{}' })
+    .then(function(r){ return r.json(); })
+    .then(function(result){ if (result.success) { closeDetail(); loadSubmissions(); } });
+}
+
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+  // Auto-load on page start
+  document.addEventListener('DOMContentLoaded', function() {
+    loadSubmissions();
+    setInterval(function(){ if (!currentId) loadSubmissions(); }, 30000);
+  });
+</script>
+<div style="position:fixed;bottom:28px;right:24px;z-index:50"><button onclick="openDashForm()" style="width:56px;height:56px;background:#c9a84c;color:#1a1a1a;border:none;border-radius:50%;font-size:28px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(201,168,76,0.5);display:flex;align-items:center;justify-content:center">+</button></div>
+<div id="dash-form-overlay" onclick="closeDashForm()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:200"></div>
+<div id="dash-form-panel" style="display:none;position:fixed;top:0;right:0;width:100%;max-width:480px;height:100vh;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:201;overflow-y:auto">
+  <div style="background:#2c2c2c;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0">
+    <span style="color:#e0c97a;font-size:16px;font-weight:700">New Receipt</span>
+    <button onclick="closeDashForm()" style="background:transparent;border:1.5px solid #e0c97a;color:#e0c97a;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">✕ Cancel</button>
+  </div>
+  <div id="dash-form-body" style="padding:16px 16px 100px"></div>
+</div>
+<script>
+var DASH_PRODS = [
+  {id:'entity',label:'Entity Filing (LLC)',hasNote:false},
+  {id:'office',label:'Office Supplies (business in a box)',hasNote:false},
+  {id:'credit',label:'Credit Boost',hasNote:false},
+  {id:'funding',label:'Business Funding Application',hasNote:false},
+  {id:'hosting',label:'Hosting',hasNote:true,notePlaceholder:'e.g. 1 year'},
+  {id:'website',label:'Website Design',hasNote:false},
+  {id:'domain',label:'Custom Domain Name',hasNote:false},
+  {id:'ecomm',label:'E-Commerce',hasNote:false},
+  {id:'seo',label:'SEO Package',hasNote:false},
+  {id:'logo',label:'Logo Design',hasNote:false},
+  {id:'social',label:'Social Media Package',hasNote:false},
+  {id:'emailmkt',label:'Email Marketing',hasNote:false},
+  {id:'aibot',label:'A.I Bot',hasNote:false},
+  {id:'orient',label:'Orientation Training',hasNote:false},
+  {id:'consult',label:'Business Consultation',hasNote:false},
+  {id:'clickadv',label:'Click Advertising',hasNote:true,notePlaceholder:'e.g. $100/mo'},
+  {id:'other',label:'Other',hasNote:true,notePlaceholder:'Describe...'},
+];
+var _dfId = 0;
+
+function openDashForm(prefill) {
+  _dfId++;
+  document.getElementById('dash-form-body').innerHTML = buildDashForm(_dfId, prefill||{});
+  document.getElementById('dash-form-overlay').style.display = 'block';
+  document.getElementById('dash-form-panel').style.display = 'block';
+}
+function closeDashForm() {
+  document.getElementById('dash-form-overlay').style.display = 'none';
+  document.getElementById('dash-form-panel').style.display = 'none';
+}
+function buildDashForm(id, pre) {
+  var today = new Date().toISOString().slice(0,10);
+  var p = [];
+  p.push('<div style="display:flex;align-items:center;justify-content:center;gap:4px;padding:12px 0 16px">');
+  [1,2,3,4].forEach(function(n){p.push('<div id="dfd-'+n+'-'+id+'" style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:'+(n===1?'#2c2c2c':'#eee')+';color:'+(n===1?'#e0c97a':'#aaa')+'">'+n+'</div>'+(n<4?'<div style="width:20px;height:2px;background:#eee"></div>':''));});
+  p.push('</div>');
+  // Step 1
+  p.push('<div id="dfs-1-'+id+'">');
+  p.push('<h3 style="font-size:15px;font-weight:700;margin-bottom:14px">Customer & Company</h3>');
+  p.push(dfi2('Sales Rep','df-rep-'+id,pre.salesRep||'','Full name'));
+  p.push(dfi2('Sale Date','df-date-'+id,pre.saleDate||today,'','date'));
+  p.push(dfi2('Customer Name *','df-name-'+id,pre.customerName||'','Full name'));
+  p.push(dfi2('Street Address','df-addr-'+id,pre.customerAddress||'','123 Main St'));
+  p.push('<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+dfi2('City State ZIP','df-city-'+id,pre.customerCity||'','Phoenix AZ 85001')+dfi2('Email','df-email-'+id,pre.customerEmail||'','email@example.com')+'</div>');
+  p.push('<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:6px">Company *</label><div style="display:flex;gap:8px">');
+  ['IOS','Limitless','Other'].forEach(function(co){var sel=pre.saleCompany===co;p.push('<label data-co="'+co+'" onclick="dfCo(this,'+id+')" style="flex:1;padding:10px;border:1.5px solid '+(sel?'#c9a84c':'#dde1e7')+';border-radius:8px;background:'+(sel?'#fffdf0':'#fff')+';cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px"><input type="radio" name="dfc-'+id+'" value="'+co+'"'+(sel?' checked':'')+' style="accent-color:#c9a84c"> '+co+'</label>');});
+  p.push('</div><div id="df-other-'+id+'" style="margin-top:8px;'+(pre.saleCompany==='Other'?'':'display:none')+'">'+dfi2('','df-othername-'+id,pre.saleCompanyOther||'','Company name...')+'</div></div>');
+  p.push('<button onclick="dfGo('+id+',1,2)" style="width:100%;padding:12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">Next →</button></div>');
+  // Step 2
+  p.push('<div id="dfs-2-'+id+'" style="display:none"><h3 style="font-size:15px;font-weight:700;margin-bottom:12px">Products</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">');
+  DASH_PRODS.forEach(function(pr){var chk=(pre.products||[]).indexOf(pr.label)>-1;var nv=pre.productNotes&&pre.productNotes[pr.label]?pre.productNotes[pr.label]:'';p.push('<label onclick="dfProd(this)" style="padding:10px;border:1.5px solid '+(chk?'#c9a84c':'#dde1e7')+';border-radius:8px;background:'+(chk?'#fffdf0':'#fff')+';cursor:pointer;display:flex;flex-direction:column;gap:4px"><div style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="dfp-'+pr.id+'-'+id+'" value="'+pr.label+'"'+(chk?' checked':'')+' style="accent-color:#c9a84c"> <span style="font-size:12px">'+pr.label+'</span></div>'+(pr.hasNote?'<input type="text" id="dfn-'+pr.id+'-'+id+'" placeholder="'+(pr.notePlaceholder||'')+'" value="'+esc(nv)+'" style="'+(chk?'':'display:none;')+'padding:4px 8px;border:1px solid #dde1e7;border-radius:6px;font-size:11px">':'')+'</label>');});
+  p.push('</div><div style="display:flex;gap:10px"><button onclick="dfGo('+id+',2,1)" style="flex:1;padding:12px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;cursor:pointer">← Back</button><button onclick="dfGo('+id+',2,3)" style="flex:2;padding:12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:10px;font-weight:700;cursor:pointer">Next →</button></div></div>');
+  // Step 3
+  p.push('<div id="dfs-3-'+id+'" style="display:none"><h3 style="font-size:15px;font-weight:700;margin-bottom:14px">Payment</h3>');
+  p.push('<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+dfi2('Payment #','df-pnum-'+id,pre.paymentNum||'1','1')+dfi2('of #','df-pof-'+id,pre.paymentOf||'1','1')+'</div>');
+  p.push(dfi2('Amount','df-amt-'+id,pre.transactionAmount||'','e.g. 500'));
+  p.push('<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:6px">Payment Method</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">');
+  ['Credit Card','Debit Card','Cash','Check','Other'].forEach(function(m){var sel=pre.paymentMethod===m;p.push('<label data-method="'+m+'" onclick="dfMethod(this,'+id+')" style="padding:8px;border:1.5px solid '+(sel?'#c9a84c':'#dde1e7')+';border-radius:8px;background:'+(sel?'#fffdf0':'#fff')+';cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px"><input type="radio" name="dfm-'+id+'" value="'+m+'"'+(sel?' checked':'')+' style="accent-color:#c9a84c"> '+m+'</label>');});
+  p.push('</div></div>');
+  var cv=(pre.paymentMethod==='Credit Card'||pre.paymentMethod==='Debit Card')?'':'display:none;';
+  p.push('<div id="df-card-'+id+'" style="'+cv+'"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+dfi2('Card Last 4','df-c4-'+id,pre.cardLast4||'','4321')+dfi2('Exp MM/YY','df-exp-'+id,pre.cardExp||'','MM/YY')+'</div></div>');
+  p.push(dfi2('Rebate/Discount','df-rebate-'+id,pre.rebateDiscount||'','Internal'));
+  p.push('<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:5px">Payment Plan</label><textarea id="df-plan-'+id+'" rows="2" style="width:100%;padding:10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px">'+esc(pre.paymentPlan||'')+'</textarea></div>');
+  p.push('<div style="display:flex;gap:10px"><button onclick="dfGo('+id+',3,2)" style="flex:1;padding:12px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;cursor:pointer">← Back</button><button onclick="dfGo('+id+',3,4)" style="flex:2;padding:12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:10px;font-weight:700;cursor:pointer">Review →</button></div></div>');
+  // Step 4
+  p.push('<div id="dfs-4-'+id+'" style="display:none"><h3 style="font-size:15px;font-weight:700;margin-bottom:14px">Notes & Submit</h3>');
+  p.push('<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:5px">Sales Notes</label><textarea id="df-notes-'+id+'" rows="3" style="width:100%;padding:10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px">'+esc(pre.salesNotes||'')+'</textarea></div>');
+  p.push('<div id="df-summ-'+id+'" style="background:#f8f9fa;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px"></div>');
+  p.push('<button id="df-sub-'+id+'" onclick="dfSubmit('+id+')" style="width:100%;padding:14px;background:#c9a84c;color:#1a1a1a;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px">Submit & Generate PDF</button>');
+  p.push('<button onclick="dfGo('+id+',4,3)" style="width:100%;padding:12px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;font-size:14px;cursor:pointer">← Back</button></div>');
+  return p.join('');
+}
+function dfi2(label,id,val,ph,type){return '<div style="margin-bottom:14px">'+(label?'<label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;display:block;margin-bottom:5px">'+label+'</label>':'')+'<input type="'+(type||'text')+'" id="'+id+'" value="'+esc(String(val||''))+'" placeholder="'+esc(ph||'')+'" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px"></div>';}
+function dfCo(el,id){var v=el.getAttribute('data-co');document.querySelectorAll('input[name="dfc-'+id+'"]').forEach(function(r){r.checked=r.value===v;var l=r.closest('label');l.style.borderColor=r.checked?'#c9a84c':'#dde1e7';l.style.background=r.checked?'#fffdf0':'#fff';});var o=document.getElementById('df-other-'+id);if(o)o.style.display=v==='Other'?'block':'none';}
+function dfMethod(el,id){var v=el.getAttribute('data-method');document.querySelectorAll('input[name="dfm-'+id+'"]').forEach(function(r){r.checked=r.value===v;var l=r.closest('label');l.style.borderColor=r.checked?'#c9a84c':'#dde1e7';l.style.background=r.checked?'#fffdf0':'#fff';});var c=document.getElementById('df-card-'+id);if(c)c.style.display=(v==='Credit Card'||v==='Debit Card')?'block':'none';}
+function dfProd(el){var cb=el.querySelector('input[type=checkbox]');if(!cb)return;cb.checked=!cb.checked;el.style.borderColor=cb.checked?'#c9a84c':'#dde1e7';el.style.background=cb.checked?'#fffdf0':'#fff';var n=el.querySelector('input[type=text]');if(n)n.style.display=cb.checked?'block':'none';}
+function dfGo(id,from,to){
+  if(to>from){
+    if(from===1){if(!document.getElementById('df-name-'+id).value.trim()){alert('Customer name required.');return;}if(!document.querySelector('input[name="dfc-'+id+'"]:checked')){alert('Select a company.');return;}}
+    if(from===2){var any=DASH_PRODS.some(function(p){var cb=document.getElementById('dfp-'+p.id+'-'+id);return cb&&cb.checked;});if(!any){alert('Select at least one product.');return;}}
+  }
+  document.getElementById('dfs-'+from+'-'+id).style.display='none';
+  document.getElementById('dfs-'+to+'-'+id).style.display='block';
+  [1,2,3,4].forEach(function(n){var d=document.getElementById('dfd-'+n+'-'+id);if(!d)return;d.style.background=n<to?'#40c070':n===to?'#2c2c2c':'#eee';d.style.color=n<=to?'#fff':'#aaa';});
+  if(to===4)dfSumm(id);
+  document.getElementById('dash-form-panel').scrollTop=0;
+}
+function dfSumm(id){
+  var d=dfCol(id);
+  var el=document.getElementById('df-summ-'+id);
+  if(!el)return;
+  el.innerHTML='<div style="font-weight:700;margin-bottom:8px">Review</div>'+
+    [['Rep',d.salesRep],['Customer',d.customerName],['Company',d.saleCompany],['Amount','$'+d.transactionAmount],['Payment',d.paymentNum+' of '+d.paymentOf+' · '+d.paymentMethod],['Products',(d.products||[]).join(', ')]].map(function(r){return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:13px"><span style="color:#888">'+r[0]+'</span><span style="text-align:right;max-width:60%">'+esc(String(r[1]||'—'))+'</span></div>';}).join('');
+}
+function dfCol(id){
+  var prods=[],notes={};
+  DASH_PRODS.forEach(function(p){var cb=document.getElementById('dfp-'+p.id+'-'+id);if(cb&&cb.checked){prods.push(p.label);var ni=document.getElementById('dfn-'+p.id+'-'+id);if(ni&&ni.value.trim())notes[p.label]=ni.value.trim();}});
+  var co=document.querySelector('input[name="dfc-'+id+'"]:checked');
+  var mt=document.querySelector('input[name="dfm-'+id+'"]:checked');
+  return {
+    salesRep:(document.getElementById('df-rep-'+id)||{}).value||'',
+    saleDate:(document.getElementById('df-date-'+id)||{}).value||new Date().toISOString().slice(0,10),
+    customerName:(document.getElementById('df-name-'+id)||{}).value||'',
+    customerAddress:(document.getElementById('df-addr-'+id)||{}).value||'',
+    customerCity:(document.getElementById('df-city-'+id)||{}).value||'',
+    customerEmail:(document.getElementById('df-email-'+id)||{}).value||'',
+    products:prods,productNotes:notes,
+    saleCompany:co?co.value:'',
+    saleCompanyOther:(document.getElementById('df-othername-'+id)||{}).value||'',
+    transactionAmount:(document.getElementById('df-amt-'+id)||{}).value||'',
+    paymentNum:(document.getElementById('df-pnum-'+id)||{}).value||'1',
+    paymentOf:(document.getElementById('df-pof-'+id)||{}).value||'1',
+    paymentMethod:mt?mt.value:'',
+    cardLast4:(document.getElementById('df-c4-'+id)||{}).value||'',
+    cardExp:(document.getElementById('df-exp-'+id)||{}).value||'',
+    rebateDiscount:(document.getElementById('df-rebate-'+id)||{}).value||'',
+    paymentPlan:(document.getElementById('df-plan-'+id)||{}).value||'',
+    salesNotes:(document.getElementById('df-notes-'+id)||{}).value||'',
+  };
+}
+async function dfSubmit(id){
+  var data=dfCol(id);
+  var btn=document.getElementById('df-sub-'+id);
+  btn.disabled=true;btn.textContent='Generating...';
+  try{
+    var headers={'Content-Type':'application/json'};
+    if(TOKEN)headers['x-session-token']=TOKEN;
+    var res=await fetch('/submit',{method:'POST',headers:headers,body:JSON.stringify(data)});
+    var result=await res.json();
+    if(result.success){
+      var body=document.getElementById('dash-form-body');
+      var sigLink='';
+      body.innerHTML='<div style="text-align:center;padding:32px 16px"><div style="font-size:48px;margin-bottom:12px">✅</div><h2 style="font-size:20px;font-weight:700;margin-bottom:8px">Submitted!</h2><p style="color:#888;margin-bottom:20px">'+esc(data.customerName)+'</p>'+
+        '<div style="background:#f0f7ff;border:1px solid #c0d8f0;border-radius:10px;padding:14px;margin-bottom:16px;text-align:left">'+
+        '<div style="font-size:11px;font-weight:700;color:#888;margin-bottom:6px">🔗 SIGNING LINK</div>'+
+        '<div id="df-siglink-'+result.id+'" style="font-size:12px;color:#1a6fa8;word-break:break-all;font-family:monospace;margin-bottom:10px">Generating...</div>'+
+        '<button onclick="dfCopyLink(\''+result.id+'\')" style="padding:8px 16px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">📋 Copy Link</button></div>'+
+        '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+        '<a href="/api/pdf/'+result.id+'" target="_blank" style="flex:1;padding:11px;background:#c9a84c;color:#1a1a1a;border-radius:10px;font-size:13px;font-weight:700;text-align:center;text-decoration:none">⬇ PDF</a>'+
+        '<a href="/api/pdf/original/'+result.id+'" target="_blank" style="flex:1;padding:11px;background:#555;color:#fff;border-radius:10px;font-size:13px;font-weight:700;text-align:center;text-decoration:none">📄 Unsigned</a>'+
+        '</div>'+
+        '<button onclick="closeDashForm();loadSubmissions()" style="width:100%;padding:12px;background:transparent;border:1.5px solid #dde1e7;border-radius:10px;font-size:14px;cursor:pointer">← Done</button></div>';
+      fetch('/api/send-signature/'+result.id,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+        .then(function(r){return r.json();}).then(function(r){if(r.success){var el=document.getElementById('df-siglink-'+result.id);if(el)el.textContent=r.signingLink;}});
+      loadSubmissions();
+    }else{alert('Error: '+(result.error||'Unknown'));btn.disabled=false;btn.textContent='Submit & Generate PDF';}
+  }catch(e){alert('Could not reach server.');btn.disabled=false;btn.textContent='Submit & Generate PDF';}
+}
+function dfCopyLinkBtn(btn){var id=btn.getAttribute('data-sid');dfCopyLink(id,btn);}
+function dfCopyLink(id,btn){var el=document.getElementById('df-siglink-'+id);if(el&&el.textContent!=='Generating...'){navigator.clipboard.writeText(el.textContent).catch(function(){});var btn=event.target;btn.textContent='✅ Copied!';setTimeout(function(){btn.textContent='📋 Copy Link';},2000);}}
+</script>
+</body>
+</html>

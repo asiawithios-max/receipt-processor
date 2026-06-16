@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Your Receipt</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f4f5f7; color: #1a1a2e; min-height: 100vh;
+}
+header {
+  background: #5a5a5a; padding: 14px 20px; text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.header-logo { height: 48px; width: auto; object-fit: contain; }
+main { max-width: 700px; margin: 0 auto; padding: 28px 16px 60px; }
+
+/* Receipt preview card */
+.receipt-card {
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 24px;
+}
+.receipt-header {
+  background: #2c2c2c; padding: 16px 20px;
+}
+.receipt-header h2 { color: #e0c97a; font-size: 16px; font-weight: 700; }
+.receipt-header p  { color: #aaa; font-size: 12px; margin-top: 3px; }
+.receipt-body { padding: 20px; }
+.receipt-row {
+  display: flex; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; gap: 16px;
+}
+.receipt-row:last-child { border-bottom: none; }
+.receipt-label { font-weight: 600; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; min-width: 120px; }
+.receipt-value { color: #1a1a2e; text-align: right; word-break: break-word; }
+.receipt-amount { font-size: 22px; font-weight: 700; color: #1a1a2e; padding: 14px 20px; background: #f7f8fa; text-align: center; border-top: 1px solid #f0f0f0; }
+
+/* Legal text */
+.legal-card {
+  background: #fff; border-radius: 14px; padding: 20px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06); margin-bottom: 24px;
+  font-size: 12px; color: #555; line-height: 1.7;
+}
+.legal-card h3 { font-size: 13px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
+.legal-card p  { margin-bottom: 8px; }
+
+/* Signature section */
+.sig-card {
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 24px;
+}
+.sig-header { background: #2c2c2c; padding: 14px 20px; }
+.sig-header h3 { color: #e0c97a; font-size: 15px; font-weight: 700; }
+.sig-header p  { color: #aaa; font-size: 12px; margin-top: 3px; }
+.sig-body { padding: 20px; }
+
+.sig-agreement {
+  background: #fffdf0; border: 1px solid #e8d89a; border-radius: 8px;
+  padding: 12px 16px; font-size: 13px; color: #7a5c00; margin-bottom: 16px;
+  line-height: 1.5; font-weight: 500;
+}
+
+.sig-date-row { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-end; }
+.sig-date-group { flex: 1; }
+.sig-date-group label { display: block; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 5px; }
+.sig-date-group input {
+  width: 100%; padding: 10px 12px; border: 1.5px solid #dde1e7;
+  border-radius: 8px; font-size: 14px; color: #1a1a2e; background: #fff;
+}
+
+.canvas-wrap {
+  border: 2px solid #dde1e7; border-radius: 10px; overflow: hidden;
+  background: #fafafa; position: relative; margin-bottom: 10px;
+}
+.canvas-wrap canvas { display: block; width: 100%; touch-action: none; }
+.canvas-placeholder {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  color: #ccc; font-size: 14px; pointer-events: none; text-align: center;
+}
+.canvas-placeholder span { display: block; font-size: 28px; margin-bottom: 4px; }
+
+.canvas-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+.btn-clear {
+  padding: 9px 20px; background: transparent; border: 1.5px solid #dde1e7;
+  color: #888; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-clear:hover { border-color: #e74c3c; color: #e74c3c; }
+
+.btn-sign {
+  width: 100%; padding: 17px; background: #2c2c2c; border: none;
+  color: #e0c97a; font-size: 16px; font-weight: 700;
+  border-radius: 12px; cursor: pointer; transition: all 0.2s;
+}
+.btn-sign:hover { background: #444; }
+.btn-sign:disabled { background: #ccc; color: #999; cursor: not-allowed; }
+
+/* Success screen */
+.success-screen {
+  background: #fff; border-radius: 16px; padding: 48px 24px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08); text-align: center; display: none;
+}
+.success-icon { font-size: 64px; margin-bottom: 16px; }
+.success-screen h2 { font-size: 24px; color: #1a1a2e; margin-bottom: 8px; }
+.success-screen p  { font-size: 14px; color: #888; margin-bottom: 6px; }
+.success-screen .signed-id { font-family: monospace; font-size: 12px; color: #bbb; margin-top: 16px; }
+
+/* Already signed */
+.already-signed {
+  background: #fff; border-radius: 14px; padding: 40px 24px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08); text-align: center;
+}
+.already-signed h2 { font-size: 20px; color: #1a1a2e; margin-bottom: 8px; }
+.already-signed p  { font-size: 14px; color: #888; }
+
+/* Error */
+.error-screen {
+  background: #fff; border-radius: 14px; padding: 40px 24px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08); text-align: center;
+}
+.error-screen h2 { color: #e74c3c; margin-bottom: 8px; }
+.error-screen p  { color: #888; font-size: 14px; }
+
+#loading { text-align: center; padding: 60px; color: #aaa; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/logos/joint.png" class="header-logo" alt="Logo" onerror="this.style.display='none'">
+</header>
+
+<main>
+  <div id="loading">Loading your receipt...</div>
+  <div id="content" style="display:none"></div>
+  <div class="success-screen" id="success-screen">
+    <div class="success-icon">✅</div>
+    <h2>Receipt Signed!</h2>
+    <p>Thank you — your signature has been recorded.</p>
+    <p style="margin-top:16px">
+      <a id="download-pdf-btn" href="#" target="_blank"
+        style="display:inline-block;padding:13px 32px;background:#2c2c2c;color:#e0c97a;font-size:15px;font-weight:700;border-radius:10px;text-decoration:none">
+        ⬇ Download Signed Receipt
+      </a>
+    </p>
+    <p class="signed-id" id="signed-id"></p>
+  </div>
+</main>
+
+<script>
+const token = window.location.pathname.split('/sign/')[1];
+let submission = null;
+let canvas, ctx, drawing = false;
+let hasSignature = false;
+
+async function load() {
+  try {
+    const res = await fetch('/api/sign/' + token);
+    const data = await res.json();
+
+    if (!data.success) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      document.getElementById('content').innerHTML = `
+        <div class="error-screen">
+          <h2>⚠️ Link Not Found</h2>
+          <p>This signing link is invalid or has expired. Please contact your sales representative.</p>
+        </div>`;
+      return;
+    }
+
+    submission = data.submission;
+
+    if (submission.signatureStatus === 'signed') {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      document.getElementById('content').innerHTML = `
+        <div class="already-signed">
+          <div style="font-size:48px;margin-bottom:12px">✅</div>
+          <h2>Already Signed</h2>
+          <p>This receipt was signed on ${new Date(submission.signedAt).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'})}.</p>
+          <p style="margin-top:8px">Thank you, ${esc(submission.customerName)}.</p>
+        </div>`;
+      return;
+    }
+
+    renderSigning(submission);
+  } catch (e) {
+    document.getElementById('loading').innerHTML = 'Error loading receipt. Please try again.';
+  }
+}
+
+function renderSigning(s) {
+  const company = s.saleCompany === 'Limitless' ? 'Limitless Business Solutions' : s.saleCompany === 'IOS' ? 'IOS' : s.saleCompany;
+  const displayDate = s.saleDate
+    ? new Date(s.saleDate + 'T12:00:00').toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'})
+    : new Date(s.timestamp).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
+
+  document.getElementById('content').innerHTML = `
+    <div class="receipt-card">
+      <div class="receipt-header">
+        <h2>Purchase Receipt</h2>
+        <p>Please review and sign below</p>
+      </div>
+      <div class="receipt-body">
+        <div class="receipt-row"><span class="receipt-label">Date</span><span class="receipt-value">${esc(displayDate)}</span></div>
+        <div class="receipt-row"><span class="receipt-label">Customer</span><span class="receipt-value">${esc(s.customerName)}</span></div>
+        <div class="receipt-row"><span class="receipt-label">Company</span><span class="receipt-value">${esc(company)}</span></div>
+        <div class="receipt-row"><span class="receipt-label">Products</span><span class="receipt-value">${esc((s.products||[]).join(', '))}</span></div>
+        <div class="receipt-row"><span class="receipt-label">Payment</span><span class="receipt-value">${esc(s.paymentNum)} of ${esc(s.paymentOf)} · ${esc(s.paymentMethod||'—')}${s.cardLast4?' · xxxx-'+esc(s.cardLast4):''}</span></div>
+        ${s.paymentPlan ? `<div class="receipt-row"><span class="receipt-label">Plan</span><span class="receipt-value">${esc(s.paymentPlan)}</span></div>` : ''}
+      </div>
+      <div class="receipt-amount">Total: $${esc(s.transactionAmount)}</div>
+    </div>
+
+    <div class="legal-card">
+      <h3>Terms & Conditions</h3>
+      <p>${esc(company)} guarantees to deliver the products and services listed above upon our receipt of your signed purchase receipt. Your signature below is an accurate representation of your physical signature and affirms your acceptance of the above-captioned charges for the products and services described.</p>
+      <p>Although we cannot make guarantees of income or specific results from the products and services we provide, we are committed to providing the best possible products and services of their kind and a dedication to providing the best possible learning experience. Please remember, we offer a 3-day right of rescission.</p>
+      <p>If for any reason you are not happy with your purchase, please know we will do everything we can to resolve any concerns that may arise, up to and including prorated refunds for any unused portion of your training services. Please do not hesitate to call us at our direct, toll-free number, (844) 422-5371.</p>
+    </div>
+
+    <div class="sig-card">
+      <div class="sig-header">
+        <h3>Your Signature</h3>
+        <p>Sign with your mouse or finger in the box below</p>
+      </div>
+      <div class="sig-body">
+        <div class="sig-agreement">
+          <strong>I have read, understand, and agree to the terms and conditions as detailed on this receipt.</strong>
+        </div>
+        <div class="sig-date-row">
+          <div class="sig-date-group">
+            <label>Your Full Name</label>
+            <input type="text" id="signer-name" placeholder="${esc(s.customerName)}" value="${esc(s.customerName)}">
+          </div>
+          <div class="sig-date-group" style="max-width:160px">
+            <label>Date</label>
+            <input type="text" id="sign-date" value="${new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})}" readonly style="background:#f5f5f5;color:#888">
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvas-wrap">
+          <canvas id="sig-canvas" height="160"></canvas>
+          <div class="canvas-placeholder" id="canvas-placeholder">
+            <span>✍️</span>Sign here
+          </div>
+        </div>
+        <div class="canvas-actions">
+          <button class="btn-clear" onclick="clearSig()">✕ Clear</button>
+          <span style="font-size:12px;color:#aaa;align-self:center">Draw your signature above</span>
+        </div>
+        <button class="btn-sign" id="sign-btn" onclick="submitSignature()">
+          ✅ I Agree &amp; Sign Receipt
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+  initCanvas();
+}
+
+function initCanvas() {
+  canvas = document.getElementById('sig-canvas');
+  ctx    = canvas.getContext('2d');
+
+  // Set canvas size
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.width  = wrap.offsetWidth;
+  canvas.height = 160;
+
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth   = 2.5;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+
+  // Mouse events
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDraw);
+  canvas.addEventListener('mouseleave', stopDraw);
+
+  // Touch events
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e.touches[0]); }, { passive: false });
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); draw(e.touches[0]); },      { passive: false });
+  canvas.addEventListener('touchend',   stopDraw);
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top)  * scaleY,
+  };
+}
+
+function startDraw(e) {
+  drawing = true;
+  const p = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  document.getElementById('canvas-placeholder').style.display = 'none';
+}
+
+function draw(e) {
+  if (!drawing) return;
+  const p = getPos(e);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  hasSignature = true;
+}
+
+function stopDraw() { drawing = false; }
+
+function clearSig() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hasSignature = false;
+  document.getElementById('canvas-placeholder').style.display = 'block';
+}
+
+async function submitSignature() {
+  if (!hasSignature) {
+    alert('Please sign in the box before submitting.');
+    return;
+  }
+  const name = document.getElementById('signer-name').value.trim();
+  if (!name) { alert('Please enter your full name.'); return; }
+
+  const btn = document.getElementById('sign-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  const signatureImage = canvas.toDataURL('image/png');
+  const signDate = document.getElementById('sign-date').value;
+
+  try {
+    const res = await fetch('/api/sign/' + token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signatureImage, signerName: name, signDate }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'block';
+      document.getElementById('signed-id').textContent = 'Receipt ID: ' + (result.id || token);
+      var dlBtn = document.getElementById('download-pdf-btn');
+      if (dlBtn && result.id) dlBtn.href = '/api/pdf/' + result.id;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      alert('Error: ' + (result.error || 'Something went wrong'));
+      btn.disabled = false;
+      btn.textContent = '✅ I Agree & Sign Receipt';
+    }
+  } catch (e) {
+    alert('Could not connect to server. Please try again.');
+    btn.disabled = false;
+    btn.textContent = '✅ I Agree & Sign Receipt';
+  }
+}
+
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+load();
+</script>
+</body>
+</html>

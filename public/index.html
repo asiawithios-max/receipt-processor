@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting...</title>
+    <script>
+        // Instant Client-Side Session Routing
+        (function() {
+            var token  = localStorage.getItem('rp_token');
+            var expiry = localStorage.getItem('rp_expiry');
+            var user   = JSON.parse(localStorage.getItem('rp_user') || '{}');
+
+            // If no active session, or expired, go to login
+            if (!token || !expiry || new Date() >= new Date(expiry)) {
+                window.location.href = '/login';
+                return;
+            }
+
+            // Route instantly based on stored employee role
+            if (user.role === 'superadmin') { 
+                window.location.href = '/dashboard'; 
+            } else if (user.role === 'rep') { 
+                window.location.href = '/rep'; 
+            } else if (user.role === 'cs') { 
+                window.location.href = '/cs'; 
+            } else {
+                window.location.href = '/login';
+            }
+        })();
+    </script>
+</head>
+<body style="background: #1a1a2e; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
+    <div>Loading dashboard...</div>
+</body>
+</html>
