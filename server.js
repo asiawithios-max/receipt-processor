@@ -715,28 +715,38 @@ app.post('/api/submissions/:id/pool-exclude', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ── Notes / Messaging ────────────────────────────────────────
-// GET notes for a submission
-app.get('/api/submissions/:id/notes', async (req, res) => {
+// ── Global Banner (admin sends, reps dismiss) ───────────────
+
+// POST send global banner (admin only)
+app.post('/api/admin/notes', async (req, res) => {
   try {
-    const notes = await db.collection('notes').find({ submissionId: req.params.id })
-      .sort({ createdAt: 1 }).toArray();
-    res.json(notes);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const token = req.headers['x-session-token'];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const session = await getSessions().findOne({ token, active: true });
+    if (!session || (session.role !== 'superadmin' && session.role !== 'cs')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const sa = SUPER_ADMINS.find(a => a.id === session.repId);
+    const rep = sa ? null : await getReps().findOne({ id: session.repId });
+    const senderName = sa ? sa.name : (rep ? rep.name : 'Admin');
+    const { text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Message text required' });
+    const note = {
+      id: require('crypto').randomBytes(4).toString('hex').toUpperCase(),
+      senderName,
+      text: text.trim(),
+      noteType: 'global',
+      global: true,
+      resolved: false,
+      dismissedBy: [],
+      createdAt: new Date().toISOString()
+    };
+    await db.collection('notes').insertOne(note);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// GET all notes for a rep (unread count + list)
-app.get('/api/notes/for-rep/:repId', async (req, res) => {
-  try {
-    const notes = await db.collection('notes').find({
-      targetRepId: req.params.repId,
-      resolved: { $ne: true }
-    }).sort({ createdAt: -1 }).toArray();
-    res.json(notes);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// GET global banners for a rep
+// GET global banners for a rep (undismissed only)
 app.get('/api/notes/global', async (req, res) => {
   try {
     const repId = req.query.repId;
@@ -749,137 +759,19 @@ app.get('/api/notes/global', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST send a note
-app.post('/api/notes', async (req, res) => {
-  try {
-    const token = req.headers['x-session-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const session = await getSessions().findOne({ token, active: true });
-    if (!session) return res.status(401).json({ error: 'Unauthorized' });
-    let senderName = 'Unknown';
-    let senderRole = session.role;
-    if (session.role === 'superadmin') {
-      const sa = SUPER_ADMINS.find(function(a) { return a.id === session.repId; });
-      if (sa) senderName = sa.name;
-    } else {
-      const rep = await getReps().findOne({ id: session.repId });
-      if (rep) senderName = rep.name;
-    }
-    const {
-      submissionId, targetRepId, text, responseNeeded,
-      noteType, doNotClose
-    } = req.body;
-    if (!text || !text.trim()) return res.status(400).json({ error: 'Note text required' });
-    const note = {
-      id: require('crypto').randomBytes(4).toString('hex').toUpperCase(),
-      submissionId: submissionId || null,
-      targetRepId: targetRepId || null,
-      senderName,
-      senderRole,
-      senderId: session.repId,
-      text: text.trim(),
-      responseNeeded: responseNeeded === true,
-      noteType: noteType || 'submission',
-      doNotClose: doNotClose === true,
-      resolved: false,
-      readBy: [],
-      dismissedBy: [],
-      createdAt: new Date().toISOString(),
-      replies: []
-    };
-    await db.collection('notes').insertOne(note);
-    res.json({ success: true, note });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// POST reply to a note
-app.post('/api/notes/:id/reply', async (req, res) => {
-  try {
-    const token = req.headers['x-session-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const session = await getSessions().findOne({ token, active: true });
-    if (!session) return res.status(401).json({ error: 'Unauthorized' });
-    let senderName = 'Unknown';
-    if (session.role === 'superadmin') {
-      const sa = SUPER_ADMINS.find(function(a) { return a.id === session.repId; });
-      if (sa) senderName = sa.name;
-    } else {
-      const rep = await getReps().findOne({ id: session.repId });
-      if (rep) senderName = rep.name;
-    }
-    const { text } = req.body;
-    if (!text || !text.trim()) return res.status(400).json({ error: 'Reply text required' });
-    const reply = {
-      senderName,
-      senderId: session.repId,
-      text: text.trim(),
-      createdAt: new Date().toISOString()
-    };
-    // Auto-resolve on reply if responseNeeded
-    await db.collection('notes').updateOne({ id: req.params.id }, {
-      $push: { replies: reply },
-      $set: { resolved: true, resolvedAt: new Date().toISOString() }
-    });
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// POST mark note as read (auto-resolve if no response needed)
-app.post('/api/notes/:id/read', async (req, res) => {
-  try {
-    const { repId } = req.body;
-    const note = await db.collection('notes').findOne({ id: req.params.id });
-    if (!note) return res.status(404).json({ error: 'Not found' });
-    const update = { $addToSet: { readBy: repId } };
-    if (!note.responseNeeded && note.noteType !== 'global' && !note.doNotClose) {
-      update.$set = { resolved: true, resolvedAt: new Date().toISOString() };
-    }
-    await db.collection('notes').updateOne({ id: req.params.id }, update);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// POST dismiss global banner
+// POST dismiss a banner (rep dismisses for themselves)
 app.post('/api/notes/:id/dismiss', async (req, res) => {
   try {
-    const { repId } = req.body;
-    await db.collection('notes').updateOne({ id: req.params.id }, {
-      $addToSet: { dismissedBy: repId }
-    });
+    const token = req.headers['x-session-token'];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const session = await getSessions().findOne({ token, active: true });
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
+    await db.collection('notes').updateOne(
+      { id: req.params.id },
+      { $addToSet: { dismissedBy: session.repId } }
+    );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// POST resolve a doNotClose note (admin/cs only)
-app.post('/api/notes/:id/resolve', async (req, res) => {
-  try {
-    const { action } = req.body; // 'remove-from-pool' or 'keep-in-pool'
-    const note = await db.collection('notes').findOne({ id: req.params.id });
-    if (!note) return res.status(404).json({ error: 'Not found' });
-    if (action === 'remove-from-pool' && note.submissionId) {
-      await getCol().updateOne({ id: note.submissionId }, { $set: { excludeFromPool: true } });
-    }
-    await db.collection('notes').updateOne({ id: req.params.id }, {
-      $set: { resolved: true, resolvedAt: new Date().toISOString(), resolveAction: action || 'dismissed' }
-    });
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// DELETE a note (admin only)
-app.delete('/api/notes/:id', async (req, res) => {
-  try {
-    await db.collection('notes').deleteOne({ id: req.params.id });
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// GET all notes for admin export/management
-app.get('/api/notes/all', async (req, res) => {
-  try {
-    const notes = await db.collection('notes').find({}).sort({ createdAt: -1 }).toArray();
-    res.json(notes);
-  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Sign page — link tracking ─────────────────────────────────
