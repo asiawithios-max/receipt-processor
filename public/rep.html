@@ -164,9 +164,48 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div class="rep-header-right">
     <span class="session-timer" id="session-timer"></span>
     <a href="/help" class="btn-logout" style="text-decoration:none">Help</a>
+    <button class="btn-logout" style="position:relative;background:#6c3483;color:#fff;border-color:#6c3483" onclick="openRepNotes()">📝 Notes<span id="rep-notes-badge" style="display:none;position:absolute;top:2px;right:2px;background:#e74c3c;color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;font-weight:700;line-height:14px;text-align:center"></span></button>
+    <button class="btn-logout" style="background:#1a6fc4;color:#fff;border-color:#1a6fc4" onclick="openRepOpenReceipts()">📋 Open</button>
     <button class="btn-logout" onclick="doLogout()">Logout</button>
   </div>
 </header>
+
+<!-- Global banner -->
+<div id="rep-global-banner" style="display:none;background:#fff3cd;border-bottom:2px solid #f0c040;padding:10px 16px;font-size:13px;font-weight:600;color:#856404;position:relative">
+  <span id="rep-global-banner-text"></span>
+  <button onclick="dismissGlobalBanner()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;color:#856404">✕</button>
+</div>
+
+<!-- Rep Notes Modal -->
+<div id="rep-notes-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400" onclick="closeRepNotes()"></div>
+<div id="rep-notes-modal" style="display:none;position:fixed;top:0;right:0;width:420px;max-width:100vw;height:100vh;background:#fff;z-index:401;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.15)">
+  <div style="padding:18px 16px 12px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between">
+    <h2 style="font-size:16px;font-weight:700;color:#1a1a2e;margin:0">📝 Notes</h2>
+    <button onclick="closeRepNotes()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">✕</button>
+  </div>
+  <div style="padding:12px 16px;border-bottom:1px solid #eee">
+    <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">Send Note to CS/Admin</div>
+    <select id="rep-note-sub-select" style="width:100%;padding:8px 10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px;margin-bottom:7px"><option value="">— Select Submission —</option></select>
+    <textarea id="rep-note-text" rows="3" placeholder="Type your note…" style="width:100%;padding:9px 10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#555;cursor:pointer"><input type="checkbox" id="rep-note-response"> Response Needed</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#c0392b;cursor:pointer"><input type="checkbox" id="rep-note-dnc"> Do Not Close</label>
+    </div>
+    <button onclick="sendRepNote()" style="margin-top:8px;width:100%;padding:10px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Send Note</button>
+  </div>
+  <div id="rep-notes-list" style="padding:12px 16px">Loading…</div>
+</div>
+
+<!-- Rep Open Receipts Modal -->
+<div id="rep-open-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400" onclick="closeRepOpenReceipts()"></div>
+<div id="rep-open-modal" style="display:none;position:fixed;top:0;right:0;width:420px;max-width:100vw;height:100vh;background:#fff;z-index:401;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.15)">
+  <div style="padding:18px 16px 12px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between">
+    <h2 style="font-size:16px;font-weight:700;color:#1a1a2e;margin:0">📋 Open Receipts</h2>
+    <button onclick="closeRepOpenReceipts()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">✕</button>
+  </div>
+  <div style="padding:10px 16px;font-size:12px;color:#888;background:#fffdf5;border-bottom:1px solid #eee">Unsigned receipts 7+ days old. Claim to close.</div>
+  <div id="rep-open-list" style="padding:12px 16px">Loading…</div>
+</div>
 
 <!-- Stats bar -->
 <div class="stats-bar">
@@ -352,6 +391,7 @@ function renderCard(s, isArchived) {
   var date = new Date(s.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   var crmBadge = s.crmConfirmedAt ? ' <span class="badge badge-crm">CRM</span>' : '';
   var refundBadge = s.refundNote ? ' <span class="badge badge-refunded">💰 Refund</span>' : '';
+  var closedBadge = s.closedBy ? ' <span class="badge badge-crm" style="background:#d4edda;color:#155724">🤝 ' + esc(s.closedBy) + '</span>' : '';
   var sentInfo = s.linkSentAt ? ' Sent ' + new Date(s.linkSentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
   var viewInfo = s.linkViewCount ? ' ' + s.linkViewCount + ' views' : '';
   var products = (s.products||[]).join(', ') || 'No products';
@@ -368,7 +408,7 @@ function renderCard(s, isArchived) {
     '<span style="font-size:15px;font-weight:700;color:#1a1a2e">' + esc(s.customerName||'—') + '</span>',
     '<span class="badge badge-' + status + '">' + statusLabel + '</span>',
     '</div>',
-    '<div style="font-size:12px;color:#888;margin-bottom:3px">' + esc(s.saleCompany||'—') + ' &middot; $' + esc(s.transactionAmount||'—') + ' &middot; ' + date + crmBadge + refundBadge + '</div>',
+    '<div style="font-size:12px;color:#888;margin-bottom:3px">' + esc(s.saleCompany||'—') + ' &middot; $' + esc(s.transactionAmount||'—') + ' &middot; ' + date + crmBadge + refundBadge + closedBadge + '</div>',
     '<div style="font-size:12px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">' + esc(products) + '</div>',
     '<div style="display:flex;align-items:center;justify-content:space-between">',
     '<div style="font-size:11px;color:#aaa">' + sentInfo + viewInfo + '</div>',
@@ -466,7 +506,7 @@ function openPanel(id) {
     drow('Sales Notes', s.salesNotes) +
     drow('Rebate', s.rebateDiscount) +
     (crmHtml ? '<div class="d-row"><span class="d-label">CRM</span><span class="d-value">'+crmHtml+'</span></div>' : '') +
-    (s.refundNote ? '<div style="margin:8px 0;padding:10px 12px;background:#fff3cd;border:1.5px solid #f0c040;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#856404;text-transform:uppercase;margin-bottom:4px">💰 Refund Note</div><div style="font-size:13px;color:#1a1a2e">'+esc(s.refundNote)+'</div><div style="font-size:11px;color:#aaa;margin-top:4px">By '+(s.refundedBy||'')+(s.refundedAt?' · '+new Date(s.refundedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'')+'</div></div>' : '');
+    (s.refundNote ? '<div style="margin:8px 0;padding:10px 12px;background:#fff3cd;border:1.5px solid #f0c040;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#856404;text-transform:uppercase;margin-bottom:4px">💰 Refund Note</div><div style="font-size:13px;color:#1a1a2e">' + esc(s.refundNote) + '</div><div style="font-size:11px;color:#aaa;margin-top:4px">By ' + (s.refundedBy||'') + (s.refundedAt ? ' · ' + new Date(s.refundedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '') + '</div></div>' : '');
 
   // Payment tab
   document.getElementById('ptab-content-payment').innerHTML =
@@ -718,6 +758,176 @@ function closeFormPanel() {
   _formPanelSub = null;
 }
 
+function openRepNotes() {
+  document.getElementById('rep-notes-overlay').style.display = 'block';
+  document.getElementById('rep-notes-modal').style.display = 'block';
+  populateRepNoteSubSelect();
+  loadRepNotes();
+}
+function closeRepNotes() {
+  document.getElementById('rep-notes-overlay').style.display = 'none';
+  document.getElementById('rep-notes-modal').style.display = 'none';
+}
+function populateRepNoteSubSelect() {
+  var sel = document.getElementById('rep-note-sub-select');
+  sel.innerHTML = '<option value="">— Select Submission —</option>';
+  allSubs.filter(function(s){ return !s.archived; }).forEach(function(s) {
+    var opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.customerName || '—';
+    sel.appendChild(opt);
+  });
+}
+function loadRepNotes() {
+  var repId = USER.id || '';
+  var list = document.getElementById('rep-notes-list');
+  list.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px">Loading…</div>';
+  fetch('/api/notes/for-rep/' + repId, { headers: { 'x-session-token': TOKEN } })
+    .then(function(r){ return r.json(); })
+    .then(function(notes) {
+      var unread = notes.filter(function(n){ return !(n.readBy||[]).includes(repId); });
+      var badge = document.getElementById('rep-notes-badge');
+      if (unread.length) {
+        badge.textContent = unread.length > 9 ? '9+' : String(unread.length);
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+      function renderNote(n) {
+        var borderColor = n.doNotClose ? '#e74c3c' : '#dde1e7';
+        var replies = (n.replies||[]).map(function(r){
+          return '<div style="margin-top:5px;padding:5px 8px;background:#f8f9fa;border-radius:6px;font-size:12px"><strong>' + esc(r.senderName) + ':</strong> ' + esc(r.text) + '</div>';
+        }).join('');
+        var replyBox = (n.responseNeeded && !n.resolved)
+          ? '<div style="margin-top:8px;display:flex;gap:6px"><input type="text" id="rep-reply-' + n.id + '" placeholder="Reply…" style="flex:1;padding:7px 9px;border:1.5px solid #dde1e7;border-radius:6px;font-size:12px"><button onclick="sendRepReply('' + n.id + '')" style="padding:7px 12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Reply</button></div>'
+          : '';
+        var readBtn = !(n.readBy||[]).includes(repId)
+          ? '<button onclick="markRepNoteRead('' + n.id + '')" style="margin-top:6px;padding:5px 10px;background:#f0f0f0;border:none;border-radius:5px;font-size:11px;cursor:pointer">Mark Read</button>'
+          : '';
+        return '<div style="border:1.5px solid ' + borderColor + ';border-radius:9px;padding:10px 12px;margin-bottom:8px">'
+          + '<div style="font-size:11px;color:#888;margin-bottom:3px">From ' + esc(n.senderName) + (n.doNotClose ? ' · <span style="color:#e74c3c;font-weight:700">⚠ Do Not Close</span>' : '') + '</div>'
+          + '<div style="font-size:13px;color:#1a1a2e;line-height:1.5">' + esc(n.text) + '</div>'
+          + '<div style="font-size:11px;color:#aaa;margin-top:3px">' + new Date(n.createdAt).toLocaleString() + '</div>'
+          + replies + replyBox + readBtn + '</div>';
+      }
+      var html = '';
+      if (unread.length) {
+        html += '<div style="font-size:11px;font-weight:700;color:#e74c3c;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px">Unread (' + unread.length + ')</div>';
+        html += unread.map(renderNote).join('');
+      }
+      var read = notes.filter(function(n){ return (n.readBy||[]).includes(repId); });
+      if (read.length) {
+        html += '<div style="font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.4px;margin:12px 0 8px">Resolved / Read</div>';
+        html += read.map(renderNote).join('');
+      }
+      if (!notes.length) html = '<div style="text-align:center;color:#aaa;padding:24px;font-size:13px">No notes yet.</div>';
+      list.innerHTML = html;
+    }).catch(function(){ list.innerHTML = '<div style="color:#e74c3c;padding:12px">Could not load notes.</div>'; });
+}
+function markRepNoteRead(noteId) {
+  fetch('/api/notes/' + noteId + '/read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify({ repId: USER.id || '' })
+  }).then(function(r){ return r.json(); }).then(function(){ loadRepNotes(); }).catch(function(){});
+}
+function sendRepNote() {
+  var subId = document.getElementById('rep-note-sub-select').value;
+  var text = (document.getElementById('rep-note-text').value || '').trim();
+  var responseNeeded = document.getElementById('rep-note-response').checked;
+  var doNotClose = document.getElementById('rep-note-dnc').checked;
+  if (!text) { alert('Note text required.'); return; }
+  if (!subId) { alert('Please select a submission.'); return; }
+  fetch('/api/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify({ submissionId: subId, text: text, responseNeeded: responseNeeded, doNotClose: doNotClose, noteType: 'submission' })
+  }).then(function(r){ return r.json(); }).then(function(result){
+    if (result.success) {
+      document.getElementById('rep-note-text').value = '';
+      document.getElementById('rep-note-response').checked = false;
+      document.getElementById('rep-note-dnc').checked = false;
+      document.getElementById('rep-note-sub-select').value = '';
+      loadRepNotes();
+    } else { alert('Error: ' + (result.error||'Unknown')); }
+  }).catch(function(){ alert('Could not reach server.'); });
+}
+function sendRepReply(noteId) {
+  var input = document.getElementById('rep-reply-' + noteId);
+  var text = (input ? input.value : '').trim();
+  if (!text) return;
+  fetch('/api/notes/' + noteId + '/reply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify({ text: text })
+  }).then(function(r){ return r.json(); }).then(function(result){
+    if (result.success) { loadRepNotes(); }
+    else { alert('Error: ' + (result.error||'Unknown')); }
+  }).catch(function(){ alert('Could not reach server.'); });
+}
+var currentGlobalBannerId = null;
+function checkGlobalBanners() {
+  var repId = USER.id || '';
+  fetch('/api/notes/global?repId=' + repId, { headers: { 'x-session-token': TOKEN } })
+    .then(function(r){ return r.json(); })
+    .then(function(banners) {
+      if (!banners.length) return;
+      currentGlobalBannerId = banners[0].id;
+      document.getElementById('rep-global-banner-text').textContent = banners[0].text;
+      document.getElementById('rep-global-banner').style.display = 'block';
+    }).catch(function(){});
+}
+function dismissGlobalBanner() {
+  document.getElementById('rep-global-banner').style.display = 'none';
+  if (!currentGlobalBannerId) return;
+  fetch('/api/notes/' + currentGlobalBannerId + '/dismiss', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify({ repId: USER.id || '' })
+  }).catch(function(){});
+}
+function openRepOpenReceipts() {
+  document.getElementById('rep-open-overlay').style.display = 'block';
+  document.getElementById('rep-open-modal').style.display = 'block';
+  loadRepOpenReceipts();
+}
+function closeRepOpenReceipts() {
+  document.getElementById('rep-open-overlay').style.display = 'none';
+  document.getElementById('rep-open-modal').style.display = 'none';
+}
+function loadRepOpenReceipts() {
+  var list = document.getElementById('rep-open-list');
+  list.innerHTML = '<div style="color:#aaa;padding:12px;font-size:13px">Loading…</div>';
+  fetch('/api/open-receipts', { headers: { 'x-session-token': TOKEN } })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data.length) {
+        list.innerHTML = '<div style="text-align:center;color:#aaa;padding:32px;font-size:14px">No open receipts right now.</div>';
+        return;
+      }
+      list.innerHTML = data.map(function(s) {
+        var days = Math.floor((Date.now() - new Date(s.timestamp).getTime()) / 86400000);
+        var closedTag = s.closedBy ? '<span style="background:#d4edda;color:#155724;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px">Closed by ' + esc(s.closedBy) + '</span>' : '';
+        var claimBtn = !s.closedBy ? '<button onclick="repClaimReceipt('' + s.id + '')" style="padding:8px 16px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Claim &amp; Close</button>' : '';
+        return '<div style="border:1.5px solid #dde1e7;border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+          + '<div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:2px">' + esc(s.customerName||'—') + closedTag + '</div>'
+          + '<div style="font-size:12px;color:#888;margin-bottom:4px">' + esc(s.salesRep||'—') + ' · ' + esc(s.saleCompany||'—') + ' · ' + days + ' days old</div>'
+          + '<div style="font-size:12px;color:#888;margin-bottom:8px">Status: <strong>' + (s.signatureStatus||'unsent') + '</strong></div>'
+          + claimBtn + '</div>';
+      }).join('');
+    }).catch(function(){ list.innerHTML = '<div style="color:#e74c3c;padding:12px">Could not load.</div>'; });
+}
+function repClaimReceipt(id) {
+  if (!confirm('Claim this receipt? Your name will be tagged as closer.')) return;
+  fetch('/api/submissions/' + id + '/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN }
+  }).then(function(r){ return r.json(); }).then(function(result){
+    if (result.success) { loadRepOpenReceipts(); loadSubs(); }
+    else { alert('Error: ' + (result.error||'Unknown')); }
+  }).catch(function(){ alert('Could not reach server.'); });
+}
+
 function doLogout() {
   fetch('/api/auth/logout', { method:'POST', headers:{'x-session-token':TOKEN} })
     .finally(function(){
@@ -738,22 +948,24 @@ function esc(str) {
 // ── Boot ──────────────────────────────────────────────────
 loadSubs();
 setInterval(loadSubs, 30000);
+checkGlobalBanners();
+loadRepNotes();
 
 // ── Form Panel Logic ──────────────────────────────────────
 var PRODUCTS = [
-  {id:'domain',    label:'Custom Domain Name',      hasNote:false},
-  {id:'hosting',   label:'Hosting',                 hasNote:true,  notePlaceholder:'e.g. 1 year'},
-  {id:'website',   label:'Website Design',          hasNote:false},
-  {id:'ecomm',     label:'E-Commerce',              hasNote:false},
-  {id:'seo',       label:'SEO Package',             hasNote:false},
-  {id:'logo',      label:'Logo Design',             hasNote:false},
-  {id:'social',    label:'Social Media Package',    hasNote:false},
-  {id:'email',     label:'Email Marketing',         hasNote:false},
-  {id:'aibot',     label:'A.I Bot',                 hasNote:false},
-  {id:'orient',    label:'Orientation Training',    hasNote:false},
-  {id:'consult',   label:'Business Consultation',   hasNote:false},
-  {id:'clickadv',  label:'Click Advertising',       hasNote:true,  notePlaceholder:'e.g. $100/mo'},
-  {id:'other',     label:'Other',                   hasNote:true,  notePlaceholder:'Describe...'},
+  { id: 'ai_bot',               label: 'A.I Bot Assistance',           hasNote: false },
+  { id: 'ad_campaign',          label: 'Advertisement Campaign',       hasNote: true,  notePlaceholder: 'Specify ad views / terms...' },
+  { id: 'branding',             label: 'Branding',                     hasNote: false },
+  { id: 'biz_funding',          label: 'Business Funding Application', hasNote: false },
+  { id: 'orientation',          label: 'Business Orientation',         hasNote: false },
+  { id: 'credit_boost',         label: 'Credit Boost',                 hasNote: false },
+  { id: 'domain',               label: 'Custom Website Domain',        hasNote: false },
+  { id: 'entity_filing',        label: 'Entity Filing',                hasNote: false },
+  { id: 'product_upgrade',      label: 'Product Upgrade',              hasNote: true,  notePlaceholder: 'Specify terms...' },
+  { id: 'streaming_commercial', label: 'Streaming Commercial',         hasNote: false },
+  { id: 'hosting',              label: 'Hosting',                      hasNote: true,  notePlaceholder: 'Specify terms...' },
+  { id: 'office_supplies',      label: 'Office Supplies ',             hasNote: false },
+  { id: 'hosting_waiver',       label: 'Hosting Fee Waiver',           hasNote: true,  notePlaceholder: 'Specify terms...' },
 ];
 
 function buildFormHTML(id, prefill) {

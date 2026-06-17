@@ -141,7 +141,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <div class="search-bar">
-  <input type="text" id="search-input" placeholder="🔍 Search by name,key word,sales rep..." oninput="renderList()">
+  <input type="text" id="search-input" placeholder="🔍 Search by customer name..." oninput="renderList()">
   <select class="rep-filter" id="rep-filter" onchange="renderList()">
     <option value="">All Reps</option>
   </select>
@@ -384,7 +384,26 @@ function openPanel(id) {
     csRefundBox.style.display = 'none';
   }
 
-  showPanelTab('summary');
+  // CRM Profile URL
+    var csCrmBox = document.getElementById('cs-crm-url-box');
+    var csCrmDisplay = document.getElementById('cs-crm-url-display');
+    var csCrmLink = document.getElementById('cs-crm-url-link');
+    var csCrmInput = document.getElementById('cs-crm-url-input');
+    csCrmBox.style.display = 'block';
+    if (s.crmProfileUrl) {
+      csCrmLink.href = s.crmProfileUrl;
+      csCrmLink.textContent = s.crmProfileUrl;
+      csCrmDisplay.style.display = 'block';
+      csCrmInput.value = s.crmProfileUrl;
+    } else {
+      csCrmDisplay.style.display = 'none';
+      csCrmInput.value = '';
+    }
+  
+    // Load notes for this submission
+    loadCsNotes(s.id);
+  
+    showPanelTab('summary');
   document.getElementById('panel-overlay').style.display = 'block';
   document.getElementById('detail-panel').style.display  = 'block';
 
@@ -456,6 +475,92 @@ function csOpenRefundModal() {
     if (result.success) { closePanel(); loadSubs(); }
     else { alert('Error: '+(result.error||'Unknown')); }
   }).catch(function(){ alert('Could not reach server.'); });
+}
+
+function csSaveCrmUrl() {
+  if (!currentSub) return;
+  var url = (document.getElementById('cs-crm-url-input').value || '').trim();
+  fetch('/api/submissions/' + currentSub.id + '/crm-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify({ crmProfileUrl: url })
+  }).then(function(r) { return r.json(); }).then(function(result) {
+    if (result.success) {
+      currentSub.crmProfileUrl = url;
+      var link = document.getElementById('cs-crm-url-link');
+      var display = document.getElementById('cs-crm-url-display');
+      if (url) { link.href = url; link.textContent = url; display.style.display = 'block'; }
+      else { display.style.display = 'none'; }
+    } else { alert('Error saving CRM URL'); }
+  }).catch(function() { alert('Could not reach server.'); });
+}
+
+function loadCsNotes(subId) {
+  var container = document.getElementById('ptab-content-notes');
+  container.innerHTML = '<div style="padding:12px;color:#aaa;font-size:13px">Loading notes…</div>';
+  fetch('/api/submissions/' + subId + '/notes', { headers: { 'x-session-token': TOKEN } })
+    .then(function(r) { return r.json(); })
+    .then(function(notes) {
+      var html = '<div style="padding:12px">'
+        + '<div style="margin-bottom:12px">'
+        + '<textarea id="cs-note-input" rows="3" placeholder="Type a note…" style="width:100%;padding:9px 10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>'
+        + '<div style="display:flex;gap:8px;margin-top:6px;align-items:center">'
+        + '<label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#555;cursor:pointer"><input type="checkbox" id="cs-note-response"> Response Needed</label>'
+        + '<label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#c0392b;cursor:pointer"><input type="checkbox" id="cs-note-dnc"> Do Not Close</label>'
+        + '<button onclick="sendCsNote(\''+ subId +'\')" style="margin-left:auto;padding:8px 14px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Send</button>'
+        + '</div></div>';
+      if (!notes.length) {
+        html += '<div style="text-align:center;color:#aaa;padding:16px;font-size:13px">No notes yet.</div>';
+      } else {
+        html += notes.map(function(n) {
+          var borderColor = n.doNotClose ? '#e74c3c' : '#dde1e7';
+          var resolvedStyle = n.resolved ? 'opacity:0.5' : '';
+          var replies = (n.replies || []).map(function(r) {
+            return '<div style="margin-top:5px;padding:5px 8px;background:#f8f9fa;border-radius:6px;font-size:12px"><strong>' + esc(r.senderName) + ':</strong> ' + esc(r.text) + '</div>';
+          }).join('');
+          var replyBox = (!n.resolved && n.responseNeeded)
+            ? '<div style="margin-top:8px;display:flex;gap:6px"><input type="text" id="cs-reply-' + n.id + '" placeholder="Reply…" style="flex:1;padding:7px 9px;border:1.5px solid #dde1e7;border-radius:6px;font-size:12px"><button onclick="sendCsReply(\''+ n.id +'\')" style="padding:7px 12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Reply</button></div>'
+            : '';
+          return '<div style="border:1.5px solid ' + borderColor + ';border-radius:9px;padding:10px 12px;margin-bottom:8px;' + resolvedStyle + '>'
+            + '<div style="font-size:11px;color:#888;margin-bottom:3px">' + esc(n.senderName) + (n.resolved ? ' · <span style="color:#28a745">Resolved</span>' : '') + (n.doNotClose ? ' · <span style="color:#e74c3c;font-weight:700">⚠ Do Not Close</span>' : '') + '</div>'
+            + '<div style="font-size:13px;color:#1a1a2e;line-height:1.5">' + esc(n.text) + '</div>'
+            + '<div style="font-size:11px;color:#aaa;margin-top:3px">' + new Date(n.createdAt).toLocaleString() + '</div>'
+            + replies + replyBox + '</div>';
+        }).join('');
+      }
+      html += '</div>';
+      container.innerHTML = html;
+    }).catch(function() { container.innerHTML = '<div style="color:#e74c3c;padding:12px">Could not load notes.</div>'; });
+}
+
+function sendCsNote(subId) {
+  var text = (document.getElementById('cs-note-input').value || '').trim();
+  var responseNeeded = document.getElementById('cs-note-response').checked;
+  var doNotClose = document.getElementById('cs-note-dnc').checked;
+  if (!text) { alert('Note text required.'); return; }
+  var targetRepId = currentSub ? currentSub.repId : null;
+  fetch('/api/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify({ submissionId: subId, targetRepId: targetRepId, text: text, responseNeeded: responseNeeded, doNotClose: doNotClose, noteType: 'submission' })
+  }).then(function(r) { return r.json(); }).then(function(result) {
+    if (result.success) { document.getElementById('cs-note-input').value = ''; loadCsNotes(subId); }
+    else { alert('Error: ' + (result.error || 'Unknown')); }
+  }).catch(function() { alert('Could not reach server.'); });
+}
+
+function sendCsReply(noteId) {
+  var input = document.getElementById('cs-reply-' + noteId);
+  var text = (input ? input.value : '').trim();
+  if (!text) return;
+  fetch('/api/notes/' + noteId + '/reply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
+    body: JSON.stringify({ text: text })
+  }).then(function(r) { return r.json(); }).then(function(result) {
+    if (result.success && currentSub) { loadCsNotes(currentSub.id); }
+    else { alert('Error: ' + (result.error || 'Unknown')); }
+  }).catch(function() { alert('Could not reach server.'); });
 }
 
 function doLogout() {
