@@ -33,7 +33,10 @@ async function connectDB() {
   const client = new MongoClient(MONGODB_URI);
   await client.connect();
   // Use database name from URI or default to 'receipts'
-  const dbName = process.env.MONGODB_URI && process.env.MONGODB_URI.includes('/receipts-dev') ? 'receipts-dev' : 'receipts';
+  const uri = process.env.MONGODB_URI || '';
+  const dbName = uri.includes('/receipts-dev') ? 'receipts-dev'
+               : uri.includes('/receipts-staging') ? 'receipts-staging'
+               : 'receipts';
   db = client.db(dbName);
   console.log('Connected to MongoDB');
 
