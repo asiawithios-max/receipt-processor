@@ -206,7 +206,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
       return res.json({
         success: true, token, expiresAt,
-        user: { name: superAdmin.name, role: 'superadmin', mustChangePassword: false }
+        user: { id: superAdmin.id, name: superAdmin.name, role: 'superadmin', mustChangePassword: false }
       });
     }
 
@@ -229,7 +229,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       success: true, token, expiresAt,
-      user: { name: rep.name, role: rep.role, mustChangePassword: rep.mustChangePassword }
+      user: { id: rep.id, name: rep.name, role: rep.role, mustChangePassword: rep.mustChangePassword }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -539,17 +539,13 @@ app.post('/api/send-signature/:id', async (req, res) => {
     if (!s) return res.status(404).json({ error: 'Not found' });
     const token = s.signatureToken || uuidv4();
     const signingLink = APP_URL + '/sign/' + token;
-    // Only advance status if currently unsent — never downgrade sent/viewed/signed
-    const newStatus = (s.signatureStatus === 'signed' || s.signatureStatus === 'viewed' || s.signatureStatus === 'sent')
-      ? s.signatureStatus
-      : 'sent';
-    await getCol().updateOne({ id: req.params.id }, {
-      $set: {
-        signatureToken: token,
-        signatureStatus: newStatus,
-        signatureSentAt: s.signatureSentAt || new Date().toISOString()
-      }
-    });
+    // Only save the token — never auto-advance status to 'sent'
+    // Status only changes when rep explicitly clicks Mark Sent
+    if (!s.signatureToken) {
+      await getCol().updateOne({ id: req.params.id }, {
+        $set: { signatureToken: token }
+      });
+    }
     res.json({ success: true, signingLink });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -773,6 +769,33 @@ app.post('/api/notes/:id/dismiss', async (req, res) => {
       { id: req.params.id },
       { $addToSet: { dismissedBy: session.repId } }
     );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// ── Admin banner management ──────────────────────────────────
+app.get('/api/admin/banners', async (req, res) => {
+  try {
+    const token = req.headers['x-session-token'];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const session = await getSessions().findOne({ token, active: true });
+    if (!session || (session.role !== 'superadmin' && session.role !== 'cs')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const banners = await db.collection('notes').find({ noteType: 'global', resolved: { $ne: true } }).sort({ createdAt: -1 }).toArray();
+    res.json(banners);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/admin/banners/:id', async (req, res) => {
+  try {
+    const token = req.headers['x-session-token'];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const session = await getSessions().findOne({ token, active: true });
+    if (!session || (session.role !== 'superadmin' && session.role !== 'cs')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    await db.collection('notes').deleteOne({ id: req.params.id });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });

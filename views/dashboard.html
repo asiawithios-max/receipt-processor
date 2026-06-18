@@ -893,6 +893,7 @@ function openGlobalBannerForm() {
   document.getElementById('banner-panel').style.display = 'block';
   document.getElementById('banner-text-input').value = '';
   document.getElementById('banner-msg').textContent = '';
+  loadActiveBanners();
 }
 
 function closeGlobalBannerForm() {
@@ -912,12 +913,41 @@ function sendGlobalBanner() {
     if (result.success) {
       msg.style.color = '#28a745';
       msg.textContent = '✅ Banner sent to all reps.';
-      setTimeout(closeGlobalBannerForm, 1500);
+      document.getElementById('banner-text-input').value = '';
+      loadActiveBanners();
     } else {
       msg.style.color = '#e74c3c';
       msg.textContent = result.error || 'Error sending banner.';
     }
   }).catch(function() { msg.style.color = '#e74c3c'; msg.textContent = 'Could not reach server.'; });
+}
+
+function loadActiveBanners() {
+  fetch('/api/admin/banners', { headers: { 'x-session-token': TOKEN } })
+    .then(function(r) { return r.json(); })
+    .then(function(banners) {
+      var list = document.getElementById('active-banners-list');
+      if (!list) return;
+      if (!banners.length) {
+        list.innerHTML = '<p style="font-size:12px;color:#aaa;text-align:center;padding:8px">No active banners</p>';
+        return;
+      }
+      list.innerHTML = banners.map(function(b) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#fff3cd;border:1px solid #f0c040;border-radius:8px;margin-bottom:6px">' +
+          '<span style="font-size:13px;color:#856404;flex:1">' + esc(b.text) + '</span>' +
+          '<button onclick="deleteAdminBanner(\'' + (b.id||b._id) + '\')" style="margin-left:8px;padding:3px 10px;background:transparent;border:1px solid #e74c3c;color:#e74c3c;border-radius:5px;font-size:11px;cursor:pointer">Delete</button>' +
+          '</div>';
+      }).join('');
+    }).catch(function() {});
+}
+
+function deleteAdminBanner(id) {
+  fetch('/api/admin/banners/' + id, {
+    method: 'DELETE',
+    headers: { 'x-session-token': TOKEN }
+  }).then(function(r) { return r.json(); }).then(function(result) {
+    if (result.success) loadActiveBanners();
+  }).catch(function() {});
 }
 
 function claimReceipt(id) {
@@ -1321,6 +1351,10 @@ function dfCopyLink(id,btn){var el=document.getElementById('df-siglink-'+id);if(
   <textarea id="banner-text-input" rows="3" placeholder="Type your message…" style="width:100%;padding:10px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px;resize:vertical;box-sizing:border-box;margin-bottom:12px"></textarea>
   <button onclick="sendGlobalBanner()" style="width:100%;padding:12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Send to All Reps</button>
   <p id="banner-msg" style="font-size:13px;text-align:center;margin-top:8px"></p>
+  <div style="margin-top:16px;border-top:1px solid #eee;padding-top:12px">
+    <div style="font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px">Active Banners</div>
+    <div id="active-banners-list"><p style="font-size:12px;color:#aaa;text-align:center">Loading...</p></div>
+  </div>
 </div>
 
 </body>
