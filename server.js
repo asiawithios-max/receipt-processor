@@ -7,6 +7,7 @@ const fs         = require('fs');
 const path       = require('path');
 const { MongoClient } = require('mongodb');
 const bcrypt     = require('bcryptjs');
+const cron       = require('node-cron');
 
 const app        = express();
 const PORT       = process.env.PORT || 3000;
@@ -33,10 +34,7 @@ async function connectDB() {
   const client = new MongoClient(MONGODB_URI);
   await client.connect();
   // Use database name from URI or default to 'receipts'
-  const uri = process.env.MONGODB_URI || '';
-  const dbName = uri.includes('/receipts-dev') ? 'receipts-dev'
-               : uri.includes('/receipts-staging') ? 'receipts-staging'
-               : 'receipts';
+  const dbName = process.env.MONGODB_URI && process.env.MONGODB_URI.includes('/receipts-dev') ? 'receipts-dev' : 'receipts';
   db = client.db(dbName);
   console.log('Connected to MongoDB');
 
@@ -206,7 +204,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
       return res.json({
         success: true, token, expiresAt,
-        user: { id: superAdmin.id, name: superAdmin.name, role: 'superadmin', mustChangePassword: false }
+        user: { name: superAdmin.name, role: 'superadmin', mustChangePassword: false }
       });
     }
 
@@ -229,7 +227,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       success: true, token, expiresAt,
-      user: { id: rep.id, name: rep.name, role: rep.role, mustChangePassword: rep.mustChangePassword }
+      user: { name: rep.name, role: rep.role, mustChangePassword: rep.mustChangePassword }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -539,13 +537,17 @@ app.post('/api/send-signature/:id', async (req, res) => {
     if (!s) return res.status(404).json({ error: 'Not found' });
     const token = s.signatureToken || uuidv4();
     const signingLink = APP_URL + '/sign/' + token;
-    // Only save the token — never auto-advance status to 'sent'
-    // Status only changes when rep explicitly clicks Mark Sent
-    if (!s.signatureToken) {
-      await getCol().updateOne({ id: req.params.id }, {
-        $set: { signatureToken: token }
-      });
-    }
+    // Only advance status if currently unsent — never downgrade sent/viewed/signed
+    const newStatus = (s.signatureStatus === 'signed' || s.signatureStatus === 'viewed' || s.signatureStatus === 'sent')
+      ? s.signatureStatus
+      : 'sent';
+    await getCol().updateOne({ id: req.params.id }, {
+      $set: {
+        signatureToken: token,
+        signatureStatus: newStatus,
+        signatureSentAt: s.signatureSentAt || new Date().toISOString()
+      }
+    });
     res.json({ success: true, signingLink });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -648,10 +650,26 @@ app.delete('/api/submissions/:id/refund', async (req, res) => {
 // ── Manually set signature status (admin only) ───────────────
 app.post('/api/submissions/:id/set-status', async (req, res) => {
   try {
-    const { status } = req.body;
-    const valid = ['unsent','sent','signed'];
-    if (!valid.includes(status)) return res.status(400).json({ error: 'Invalid status. Use: unsent, sent, signed' });
-    await getCol().updateOne({ id: req.params.id }, { $set: { signatureStatus: status } });
+    const { status, unresolvedReason } = req.body;
+    const valid = ['unsent','sent','signed','unresolved'];
+    if (!valid.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+    const update = { signatureStatus: status };
+    if (status === 'unresolved') {
+      update.unresolvedReason = unresolvedReason || 'Other';
+      update.unresolvedAt = new Date().toISOString();
+    }
+    await getCol().updateOne({ id: req.params.id }, { $set: update });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// ── Set unresolved reason only (admin only) ──────────────────
+app.post('/api/submissions/:id/set-unresolved-reason', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const valid = ['Unresponsive', 'Paused Account', 'Other'];
+    if (!valid.includes(reason)) return res.status(400).json({ error: 'Invalid reason' });
+    await getCol().updateOne({ id: req.params.id }, { $set: { unresolvedReason: reason } });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
@@ -714,38 +732,28 @@ app.post('/api/submissions/:id/pool-exclude', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ── Global Banner (admin sends, reps dismiss) ───────────────
-
-// POST send global banner (admin only)
-app.post('/api/admin/notes', async (req, res) => {
+// ── Notes / Messaging ────────────────────────────────────────
+// GET notes for a submission
+app.get('/api/submissions/:id/notes', async (req, res) => {
   try {
-    const token = req.headers['x-session-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const session = await getSessions().findOne({ token, active: true });
-    if (!session || (session.role !== 'superadmin' && session.role !== 'cs')) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    const sa = SUPER_ADMINS.find(a => a.id === session.repId);
-    const rep = sa ? null : await getReps().findOne({ id: session.repId });
-    const senderName = sa ? sa.name : (rep ? rep.name : 'Admin');
-    const { text } = req.body;
-    if (!text || !text.trim()) return res.status(400).json({ error: 'Message text required' });
-    const note = {
-      id: require('crypto').randomBytes(4).toString('hex').toUpperCase(),
-      senderName,
-      text: text.trim(),
-      noteType: 'global',
-      global: true,
-      resolved: false,
-      dismissedBy: [],
-      createdAt: new Date().toISOString()
-    };
-    await db.collection('notes').insertOne(note);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    const notes = await db.collection('notes').find({ submissionId: req.params.id })
+      .sort({ createdAt: 1 }).toArray();
+    res.json(notes);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET global banners for a rep (undismissed only)
+// GET all notes for a rep (unread count + list)
+app.get('/api/notes/for-rep/:repId', async (req, res) => {
+  try {
+    const notes = await db.collection('notes').find({
+      targetRepId: req.params.repId,
+      resolved: { $ne: true }
+    }).sort({ createdAt: -1 }).toArray();
+    res.json(notes);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET global banners for a rep
 app.get('/api/notes/global', async (req, res) => {
   try {
     const repId = req.query.repId;
@@ -758,46 +766,137 @@ app.get('/api/notes/global', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST dismiss a banner (rep dismisses for themselves)
-app.post('/api/notes/:id/dismiss', async (req, res) => {
+// POST send a note
+app.post('/api/notes', async (req, res) => {
   try {
     const token = req.headers['x-session-token'];
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     const session = await getSessions().findOne({ token, active: true });
     if (!session) return res.status(401).json({ error: 'Unauthorized' });
-    await db.collection('notes').updateOne(
-      { id: req.params.id },
-      { $addToSet: { dismissedBy: session.repId } }
-    );
+    let senderName = 'Unknown';
+    let senderRole = session.role;
+    if (session.role === 'superadmin') {
+      const sa = SUPER_ADMINS.find(function(a) { return a.id === session.repId; });
+      if (sa) senderName = sa.name;
+    } else {
+      const rep = await getReps().findOne({ id: session.repId });
+      if (rep) senderName = rep.name;
+    }
+    const {
+      submissionId, targetRepId, text, responseNeeded,
+      noteType, doNotClose
+    } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Note text required' });
+    const note = {
+      id: require('crypto').randomBytes(4).toString('hex').toUpperCase(),
+      submissionId: submissionId || null,
+      targetRepId: targetRepId || null,
+      senderName,
+      senderRole,
+      senderId: session.repId,
+      text: text.trim(),
+      responseNeeded: responseNeeded === true,
+      noteType: noteType || 'submission',
+      doNotClose: doNotClose === true,
+      resolved: false,
+      readBy: [],
+      dismissedBy: [],
+      createdAt: new Date().toISOString(),
+      replies: []
+    };
+    await db.collection('notes').insertOne(note);
+    res.json({ success: true, note });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// POST reply to a note
+app.post('/api/notes/:id/reply', async (req, res) => {
+  try {
+    const token = req.headers['x-session-token'];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const session = await getSessions().findOne({ token, active: true });
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
+    let senderName = 'Unknown';
+    if (session.role === 'superadmin') {
+      const sa = SUPER_ADMINS.find(function(a) { return a.id === session.repId; });
+      if (sa) senderName = sa.name;
+    } else {
+      const rep = await getReps().findOne({ id: session.repId });
+      if (rep) senderName = rep.name;
+    }
+    const { text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Reply text required' });
+    const reply = {
+      senderName,
+      senderId: session.repId,
+      text: text.trim(),
+      createdAt: new Date().toISOString()
+    };
+    // Auto-resolve on reply if responseNeeded
+    await db.collection('notes').updateOne({ id: req.params.id }, {
+      $push: { replies: reply },
+      $set: { resolved: true, resolvedAt: new Date().toISOString() }
+    });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ── Admin banner management ──────────────────────────────────
-app.get('/api/admin/banners', async (req, res) => {
+// POST mark note as read (auto-resolve if no response needed)
+app.post('/api/notes/:id/read', async (req, res) => {
   try {
-    const token = req.headers['x-session-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const session = await getSessions().findOne({ token, active: true });
-    if (!session || (session.role !== 'superadmin' && session.role !== 'cs')) {
-      return res.status(403).json({ error: 'Forbidden' });
+    const { repId } = req.body;
+    const note = await db.collection('notes').findOne({ id: req.params.id });
+    if (!note) return res.status(404).json({ error: 'Not found' });
+    const update = { $addToSet: { readBy: repId } };
+    if (!note.responseNeeded && note.noteType !== 'global' && !note.doNotClose) {
+      update.$set = { resolved: true, resolvedAt: new Date().toISOString() };
     }
-    const banners = await db.collection('notes').find({ noteType: 'global', resolved: { $ne: true } }).sort({ createdAt: -1 }).toArray();
-    res.json(banners);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    await db.collection('notes').updateOne({ id: req.params.id }, update);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-app.delete('/api/admin/banners/:id', async (req, res) => {
+// POST dismiss global banner
+app.post('/api/notes/:id/dismiss', async (req, res) => {
   try {
-    const token = req.headers['x-session-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const session = await getSessions().findOne({ token, active: true });
-    if (!session || (session.role !== 'superadmin' && session.role !== 'cs')) {
-      return res.status(403).json({ error: 'Forbidden' });
+    const { repId } = req.body;
+    await db.collection('notes').updateOne({ id: req.params.id }, {
+      $addToSet: { dismissedBy: repId }
+    });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// POST resolve a doNotClose note (admin/cs only)
+app.post('/api/notes/:id/resolve', async (req, res) => {
+  try {
+    const { action } = req.body; // 'remove-from-pool' or 'keep-in-pool'
+    const note = await db.collection('notes').findOne({ id: req.params.id });
+    if (!note) return res.status(404).json({ error: 'Not found' });
+    if (action === 'remove-from-pool' && note.submissionId) {
+      await getCol().updateOne({ id: note.submissionId }, { $set: { excludeFromPool: true } });
     }
+    await db.collection('notes').updateOne({ id: req.params.id }, {
+      $set: { resolved: true, resolvedAt: new Date().toISOString(), resolveAction: action || 'dismissed' }
+    });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// DELETE a note (admin only)
+app.delete('/api/notes/:id', async (req, res) => {
+  try {
     await db.collection('notes').deleteOne({ id: req.params.id });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// GET all notes for admin export/management
+app.get('/api/notes/all', async (req, res) => {
+  try {
+    const notes = await db.collection('notes').find({}).sort({ createdAt: -1 }).toArray();
+    res.json(notes);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Sign page — link tracking ─────────────────────────────────
@@ -807,12 +906,15 @@ app.get('/api/sign/:token', async (req, res) => {
 
   // Track link views
   const now = new Date().toISOString();
+  // Preserve unresolved/signed status — only advance sent→viewed
+  const nextStatus = s.signatureStatus === 'signed'     ? 'signed'     :
+                     s.signatureStatus === 'unresolved' ? 'unresolved' :
+                     s.signatureStatus === 'sent'       ? 'viewed'     :
+                     s.signatureStatus === 'viewed'     ? 'viewed'     : s.signatureStatus;
   const update = {
     linkLastViewedAt: now,
     linkViewCount: (s.linkViewCount || 0) + 1,
-    signatureStatus: s.signatureStatus === 'signed' ? 'signed' :
-                     s.signatureStatus === 'sent' ? 'viewed' :
-                     s.signatureStatus === 'viewed' ? 'viewed' : s.signatureStatus
+    signatureStatus: nextStatus
   };
   if (!s.linkOpenedAt) update.linkOpenedAt = now;
   await getCol().updateOne({ signatureToken: req.params.token }, { $set: update });
@@ -828,9 +930,15 @@ app.post('/api/sign/:token', async (req, res) => {
     if (!s) return res.status(404).json({ success: false, error: 'Invalid token' });
     if (s.signatureStatus === 'signed') return res.json({ success: false, error: 'Already signed' });
     const { signatureImage, signerName, signDate } = req.body;
-    await getCol().updateOne({ signatureToken: req.params.token }, {
-      $set: { signatureStatus: 'signed', signedAt: new Date().toISOString(), signatureImage, signerName, signDate }
-    });
+    // Always set to signed regardless of prior status (clears unresolved automatically)
+    const signUpdate = {
+      signatureStatus: 'signed',
+      signedAt: new Date().toISOString(),
+      signatureImage,
+      signerName,
+      signDate
+    };
+    await getCol().updateOne({ signatureToken: req.params.token }, { $set: signUpdate });
     const updated = await getCol().findOne({ signatureToken: req.params.token });
     const dateStr = new Date(s.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const pdfPath = path.join(__dirname, 'pdfs', makePdfFilename(s));
@@ -1075,8 +1183,40 @@ function generatePDF(data, dateStr, outputPath, callback) {
   stream.on('finish', callback);
 }
 
+// ── Unresolved status cron (runs daily at 2am) ────────────────
+async function flagUnresolvedSubmissions() {
+  try {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const result = await getCol().updateMany(
+      {
+        signatureStatus: { $in: ['unsent', 'sent', 'viewed'] },
+        timestamp: { $lt: cutoff },
+        archived: { $ne: true }
+      },
+      {
+        $set: {
+          signatureStatus: 'unresolved',
+          unresolvedReason: 'Other',
+          unresolvedAt: new Date().toISOString()
+        }
+      }
+    );
+    if (result.modifiedCount > 0) {
+      console.log('[Cron] Flagged ' + result.modifiedCount + ' submissions as unresolved');
+    }
+  } catch (err) {
+    console.error('[Cron] Unresolved flag error:', err);
+  }
+}
+
 // ── Start ─────────────────────────────────────────────────────
 connectDB().then(() => {
+  // Schedule daily at 2:00 AM
+  cron.schedule('0 2 * * *', () => {
+    console.log('[Cron] Running unresolved check...');
+    flagUnresolvedSubmissions();
+  });
+
   app.listen(PORT, () => {
     console.log('\nReceipt Processor running at http://localhost:' + PORT);
     console.log('Dashboard: http://localhost:' + PORT + '/dashboard\n');
