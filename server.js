@@ -1158,10 +1158,13 @@ function generatePDF(data, dateStr, outputPath, callback) {
     }
     doc.moveTo(sigX, curY + 46).lineTo(R, curY + 46).lineWidth(0.75).stroke('#000');
     curY += 52;
-    doc.fontSize(8).font('Helvetica-Bold').fillColor('#000').text('Date: ' + (data.signDate || ''), sigX, curY);
+    const signDateDisplay = /^\d{4}-\d{2}-\d{2}$/.test(data.signDate || '')
+      ? new Date(data.signDate + 'T12:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+      : (data.signDate || '');
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#000').text('Date: ' + signDateDisplay, sigX, curY);
     curY += 14;
     doc.fontSize(7).font('Helvetica').fillColor('#aaa')
-      .text('Electronically signed on ' + (data.signDate || '') + '  |  Signature ID: ' + data.id, sigX, curY, { width: sigW });
+      .text('Electronically signed on ' + signDateDisplay + '  |  Signature ID: ' + data.id, sigX, curY, { width: sigW });
     curY += 16;
   } else {
     doc.fontSize(10).font('Helvetica-Bold').fillColor('#000').text('X', sigX, curY);
