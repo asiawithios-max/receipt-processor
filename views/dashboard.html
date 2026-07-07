@@ -1198,34 +1198,20 @@ function dfCopyLink(id,btn){var el=document.getElementById('df-siglink-'+id);if(
   <div id="open-receipts-list" style="padding:12px 16px">Loading…</div>
 </div>
 
-<!-- Notes Panel (admin/cs) -->
+<!-- Banner Panel (admin only) -->
 <div id="notes-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400" onclick="closeNotesPanel()"></div>
-<div id="notes-panel" style="display:none;position:fixed;top:0;right:0;width:500px;max-width:100vw;height:100vh;background:#fff;z-index:401;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.15)">
+<div id="notes-panel" style="display:none;position:fixed;top:0;right:0;width:480px;max-width:100vw;height:100vh;background:#fff;z-index:401;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.15)">
   <div style="padding:20px 20px 12px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between">
-    <h2 style="font-size:17px;font-weight:700;color:#1a1a2e;margin:0">📝 Notes</h2>
+    <h2 style="font-size:17px;font-weight:700;color:#1a1a2e;margin:0">📢 Rep Banners</h2>
     <button onclick="closeNotesPanel()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">✕</button>
   </div>
   <div style="padding:14px 16px;border-bottom:1px solid #eee">
-    <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px">Send Note</div>
-    <select id="note-sub-select" style="width:100%;padding:9px 10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px;margin-bottom:8px">
-      <option value="">— Select Submission —</option>
-    </select>
-    <textarea id="note-text-input" rows="3" placeholder="Type note…" style="width:100%;padding:9px 10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
-    <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#555;cursor:pointer">
-        <input type="checkbox" id="note-response-needed"> Response Needed
-      </label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#c0392b;cursor:pointer">
-        <input type="checkbox" id="note-do-not-close"> Do Not Close
-      </label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#856404;cursor:pointer;margin-left:auto">
-        <input type="checkbox" id="note-global"> Global Banner
-      </label>
-    </div>
-    <button onclick="sendAdminNote()" style="margin-top:10px;width:100%;padding:10px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Send Note</button>
+    <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px">Send Banner to All Reps</div>
+    <textarea id="note-text-input" rows="3" placeholder="Type message for all reps…" style="width:100%;padding:9px 10px;border:1.5px solid #dde1e7;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+    <button onclick="sendAdminNote()" style="margin-top:10px;width:100%;padding:10px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📢 Send Banner</button>
   </div>
   <div style="padding:14px 16px">
-    <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px">All Notes</div>
+    <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px">Active Banners</div>
     <div id="admin-notes-list">Loading…</div>
   </div>
 </div>
@@ -1236,15 +1222,6 @@ function openNotesPanel() {
   document.getElementById('notes-overlay').style.display = 'block';
   document.getElementById('notes-panel').style.display = 'block';
   loadAdminNotes();
-  // Populate submission select
-  var sel = document.getElementById('note-sub-select');
-  sel.innerHTML = '<option value="">— Select Submission —</option>';
-  (allSubmissions || []).forEach(function(s) {
-    var opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = (s.customerName || s.id) + ' — ' + (s.salesRep || '');
-    sel.appendChild(opt);
-  });
 }
 
 function closeNotesPanel() {
@@ -1257,69 +1234,39 @@ function loadAdminNotes() {
   list.innerHTML = 'Loading…';
   fetch('/api/notes/all', { headers: { 'x-session-token': TOKEN } })
     .then(function(r) { return r.json(); })
-    .then(function(notes) {
-      if (!notes.length) {
-        list.innerHTML = '<div style="color:#aaa;font-size:13px;padding:12px 0">No notes yet.</div>';
+    .then(function(banners) {
+      if (!banners.length) {
+        list.innerHTML = '<div style="color:#aaa;font-size:13px;padding:12px 0">No active banners.</div>';
         return;
       }
-      list.innerHTML = notes.map(function(n) {
-        var sub = (allSubmissions || []).find(function(s) { return s.id === n.submissionId; });
-        var subLabel = sub ? (sub.customerName || n.submissionId) : (n.submissionId || 'Global');
-        var tags = '';
-        if (n.noteType === 'global') tags += '<span style="background:#fff3cd;color:#856404;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:4px">GLOBAL</span>';
-        if (n.responseNeeded) tags += '<span style="background:#fde;color:#c0392b;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:4px">RESPONSE NEEDED</span>';
-        if (n.resolved) tags += '<span style="background:#d4edda;color:#155724;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:4px">RESOLVED</span>';
-        var replies = (n.replies || []).map(function(r) {
-          return '<div style="margin-top:6px;padding:6px 10px;background:#f8f9fa;border-radius:6px;font-size:12px"><b>' + esc(r.senderName) + ':</b> ' + esc(r.text) + '</div>';
-        }).join('');
-        return '<div style="border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:10px">' +
-          '<div style="font-size:12px;color:#888;margin-bottom:4px">' + esc(n.senderName) + ' → ' + esc(subLabel) + tags + ' <span style="float:right">' + new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '</span></div>' +
-          '<div style="font-size:13px;color:#1a1a2e;margin-bottom:6px">' + esc(n.text) + '</div>' +
-          replies +
-          (!n.resolved ? '<button onclick="resolveNote(\'' + n.id + '\')" style="margin-top:8px;padding:4px 12px;background:#2c2c2c;color:#e0c97a;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Resolve</button>' : '') +
-          '<button onclick="deleteNote(\'' + n.id + '\')" style="margin-top:8px;margin-left:6px;padding:4px 12px;background:#fee;color:#c0392b;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Delete</button>' +
+      list.innerHTML = banners.map(function(n) {
+        return '<div style="border:1px solid #f0c040;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fffdf5">' +
+          '<div style="font-size:11px;color:#888;margin-bottom:4px">' + esc(n.senderName) + ' · ' + new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</div>' +
+          '<div style="font-size:13px;color:#1a1a2e;margin-bottom:10px">' + esc(n.text) + '</div>' +
+          '<button onclick="deleteNote(\'' + n.id + '\')" style="padding:4px 12px;background:#fee;color:#c0392b;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🗑 Delete Banner</button>' +
           '</div>';
       }).join('');
     })
-    .catch(function() { list.innerHTML = '<div style="color:#e74c3c">Failed to load notes.</div>'; });
+    .catch(function() { list.innerHTML = '<div style="color:#e74c3c">Failed to load banners.</div>'; });
 }
 
 function sendAdminNote() {
-  var subId = document.getElementById('note-sub-select').value;
   var text = document.getElementById('note-text-input').value.trim();
-  var responseNeeded = document.getElementById('note-response-needed').checked;
-  var doNotClose = document.getElementById('note-do-not-close').checked;
-  var isGlobal = document.getElementById('note-global').checked;
-  if (!text) { alert('Please enter a note.'); return; }
-  var body = { text, responseNeeded, doNotClose };
-  if (isGlobal) { body.noteType = 'global'; }
-  else { body.noteType = 'submission'; body.submissionId = subId || null; }
+  if (!text) { alert('Please enter a message.'); return; }
   fetch('/api/notes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ text: text, noteType: 'global' })
   }).then(function(r) { return r.json(); }).then(function(result) {
     if (result.success) {
       document.getElementById('note-text-input').value = '';
-      document.getElementById('note-response-needed').checked = false;
-      document.getElementById('note-do-not-close').checked = false;
-      document.getElementById('note-global').checked = false;
-      document.getElementById('note-sub-select').value = '';
       loadAdminNotes();
     } else { alert('Error: ' + (result.error || 'Unknown')); }
   }).catch(function() { alert('Could not reach server.'); });
 }
 
-function resolveNote(id) {
-  fetch('/api/notes/' + id + '/resolve', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-session-token': TOKEN },
-    body: JSON.stringify({ action: 'dismissed' })
-  }).then(function(r) { return r.json(); }).then(function() { loadAdminNotes(); });
-}
-
 function deleteNote(id) {
-  if (!confirm('Delete this note permanently?')) return;
+  if (!confirm('Delete this banner permanently?')) return;
   fetch('/api/notes/' + id, {
     method: 'DELETE',
     headers: { 'x-session-token': TOKEN }
