@@ -192,13 +192,6 @@ async function load() {
   }
 }
 
-function todayISO() {
-  const d = new Date();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
 function renderSigning(s) {
   const company = s.saleCompany === 'Limitless' ? 'Limitless Business Solutions' : s.saleCompany === 'IOS' ? 'IOS' : s.saleCompany;
   const displayDate = s.saleDate
@@ -245,7 +238,7 @@ function renderSigning(s) {
           </div>
           <div class="sig-date-group" style="max-width:160px">
             <label>Date</label>
-            <input type="date" id="sign-date" value="${todayISO()}" style="background:#fff;color:#1a1a2e">
+            <input type="date" id="sign-date" value="${new Date().toISOString().slice(0,10)}" style="background:#fff;color:#333;padding:8px 12px;border:1.5px solid #dde1e7;border-radius:8px;font-size:14px">
           </div>
         </div>
         <div class="canvas-wrap" id="canvas-wrap">
@@ -338,14 +331,12 @@ async function submitSignature() {
   const name = document.getElementById('signer-name').value.trim();
   if (!name) { alert('Please enter your full name.'); return; }
 
-  const signDate = document.getElementById('sign-date').value;
-  if (!signDate) { alert('Please enter the date.'); return; }
-
   const btn = document.getElementById('sign-btn');
   btn.disabled = true;
   btn.textContent = 'Submitting...';
 
   const signatureImage = canvas.toDataURL('image/png');
+  const signDate = document.getElementById('sign-date').value;
 
   try {
     const res = await fetch('/api/sign/' + token, {
